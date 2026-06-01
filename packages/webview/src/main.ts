@@ -40,19 +40,38 @@ window.addEventListener('message', (event: MessageEvent<HostMessage>) => {
   const msg = event.data;
   if (!msg || typeof msg !== 'object') return;
 
-  try {
-    if (msg.type === 'init') {
-      handleInit(msg);
-    } else if (msg.type === 'setBasemap' && map) {
+  if (msg.type === 'init') {
+    void handleInit(msg).catch((err) => {
+      const message = err instanceof Error ? err.message : String(err);
+      send({ type: 'error', message, code: 'INIT_FAIL' });
+    });
+  } else if (msg.type === 'setBasemap' && map) {
+    try {
       map.setBasemap(msg.basemap);
+    } catch (err) {
+      send({ type: 'error', message: err instanceof Error ? err.message : String(err) });
     }
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    send({ type: 'error', message });
   }
 });
 
-function handleInit(msg: Extract<HostMessage, { type: 'init' }>): void {
+/**
+ * Convert a same-origin-fetchable JS URL into a Blob URL that lives at the
+ * page's own origin. Workers must be constructed from a same-origin URL;
+ * `webview.asWebviewUri(...)` returns a `https://file+.vscode-resource...`
+ * URL which is a *different* origin from the page's `vscode-webview://...`
+ * scheme. Round-tripping through a Blob whose URL is created by *this*
+ * window puts the worker source at this window's origin.
+ */
+async function makeSameOriginWorkerUrl(remoteUrl: string): Promise<string> {
+  const response = await fetch(remoteUrl);
+  if (!response.ok) {
+    throw new Error(`fetch worker: ${response.status} ${response.statusText}`);
+  }
+  const source = await response.text();
+  return URL.createObjectURL(new Blob([source], { type: 'application/javascript' }));
+}
+
+async function handleInit(msg: Extract<HostMessage, { type: 'init' }>): Promise<void> {
   const container = document.getElementById('map');
   if (!container) {
     send({ type: 'error', message: '#map container not found', code: 'NO_CONTAINER' });
@@ -66,7 +85,7 @@ function handleInit(msg: Extract<HostMessage, { type: 'init' }>): void {
 
   window.mapboxgl.accessToken = msg.mapboxToken;
   if (window.__MAPBOX_WORKER_URL__) {
-    window.mapboxgl.workerUrl = window.__MAPBOX_WORKER_URL__;
+    window.mapboxgl.workerUrl = await makeSameOriginWorkerUrl(window.__MAPBOX_WORKER_URL__);
   }
 
   map = new MapboxMap(container, msg.basemap, send);

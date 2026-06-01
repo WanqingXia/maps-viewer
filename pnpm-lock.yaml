@@ -43,6 +43,9 @@ importers:
         specifier: workspace:*
         version: link:../shared
     devDependencies:
+      '@maps-viewer/webview':
+        specifier: workspace:*
+        version: link:../webview
       '@types/geojson':
         specifier: ^7946.0.14
         version: 7946.0.16

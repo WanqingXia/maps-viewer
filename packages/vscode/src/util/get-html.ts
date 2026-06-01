@@ -10,42 +10,48 @@ import { getNonce } from './get-nonce.js';
  * `window.__MAPBOX_WORKER_URL__` (the webview entry assigns it onto
  * `mapboxgl.workerUrl` before constructing the map).
  *
- * Resource layout (relative to the *extension* root, which is the
- * `packages/vscode` directory in dev and the VSIX root after packaging):
- *   ../webview/vendor/mapbox-gl-csp.js
- *   ../webview/vendor/mapbox-gl-csp-worker.js
- *   ../webview/vendor/mapbox-gl.css
- *   ../webview/dist/webview.js
- *   ../webview/dist/webview.css
+ * Resource layout (all relative to the extension root's `dist/webview/`
+ * directory, which is populated by `esbuild.config.mjs`'s copy step in
+ * both dev and packaged VSIX builds):
+ *   dist/webview/mapbox-gl-csp.js
+ *   dist/webview/mapbox-gl-csp-worker.js
+ *   dist/webview/mapbox-gl.css
+ *   dist/webview/webview.js
+ *   dist/webview/webview.css
  */
 export interface BuildHtmlArgs {
   webview: vscode.Webview;
   extUri: vscode.Uri;
-  webviewDistUri: vscode.Uri;
-  webviewVendorUri: vscode.Uri;
+  /** Directory containing the bundled webview app + Mapbox vendor files. */
+  webviewAssetsUri: vscode.Uri;
   title: string;
 }
 
 export function getWebviewHtml(args: BuildHtmlArgs): string {
-  const { webview, webviewDistUri, webviewVendorUri, title } = args;
+  const { webview, webviewAssetsUri, title } = args;
   const nonce = getNonce();
 
-  const u = (base: vscode.Uri, name: string): vscode.Uri =>
-    webview.asWebviewUri(vscode.Uri.joinPath(base, name));
+  const u = (name: string): vscode.Uri =>
+    webview.asWebviewUri(vscode.Uri.joinPath(webviewAssetsUri, name));
 
-  const mapboxJs = u(webviewVendorUri, 'mapbox-gl-csp.js');
-  const mapboxWorker = u(webviewVendorUri, 'mapbox-gl-csp-worker.js');
-  const mapboxCss = u(webviewVendorUri, 'mapbox-gl.css');
-  const webviewJs = u(webviewDistUri, 'webview.js');
-  const webviewCss = u(webviewDistUri, 'webview.css');
+  const mapboxJs = u('mapbox-gl-csp.js');
+  const mapboxWorker = u('mapbox-gl-csp-worker.js');
+  const mapboxCss = u('mapbox-gl.css');
+  const webviewJs = u('webview.js');
+  const webviewCss = u('webview.css');
 
   const csp = [
     `default-src 'none'`,
     `img-src ${webview.cspSource} https: data: blob:`,
     `script-src 'nonce-${nonce}' ${webview.cspSource}`,
     `style-src ${webview.cspSource} 'unsafe-inline'`,
+    // worker-src must allow blob: so we can construct the Mapbox worker
+    // from a Blob URL (same-origin trick — see makeSameOriginWorkerUrl).
     `worker-src ${webview.cspSource} blob:`,
-    `connect-src https://*.mapbox.com https://*.tiles.mapbox.com https://api.mapbox.com https://events.mapbox.com`,
+    // connect-src must allow the webview's own resource origin so the
+    // bootstrap can `fetch()` the bundled Mapbox worker JS before
+    // wrapping it in a Blob.
+    `connect-src ${webview.cspSource} https://*.mapbox.com https://*.tiles.mapbox.com https://api.mapbox.com https://events.mapbox.com`,
     `font-src ${webview.cspSource}`,
   ].join('; ');
 

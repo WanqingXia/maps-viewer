@@ -8,8 +8,8 @@ import type { Logger } from '../util/logger.js';
 
 export interface ViewInMapsCtx {
   extUri: vscode.Uri;
-  webviewDistUri: vscode.Uri;
-  webviewVendorUri: vscode.Uri;
+  /** Directory containing the bundled webview app + Mapbox vendor files. */
+  webviewAssetsUri: vscode.Uri;
   tokenManager: TokenManager;
   logger: Logger;
 }
@@ -35,8 +35,7 @@ export async function viewInMaps(ctx: ViewInMapsCtx, uri?: vscode.Uri): Promise<
       key: targetUri.toString(),
       title: `Maps Viewer: ${fileName}`,
       extUri: ctx.extUri,
-      webviewDistUri: ctx.webviewDistUri,
-      webviewVendorUri: ctx.webviewVendorUri,
+      webviewAssetsUri: ctx.webviewAssetsUri,
       logger: ctx.logger,
       mapboxToken: token,
       basemap: defaultBasemap,

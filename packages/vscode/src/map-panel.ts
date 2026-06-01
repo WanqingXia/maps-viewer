@@ -9,8 +9,8 @@ export interface OpenMapPanelArgs {
   key: string;
   title: string;
   extUri: vscode.Uri;
-  webviewDistUri: vscode.Uri;
-  webviewVendorUri: vscode.Uri;
+  /** Directory containing the bundled webview app + Mapbox vendor files. */
+  webviewAssetsUri: vscode.Uri;
   logger: Logger;
   mapboxToken: string;
   layers: ReadonlyArray<LayerInit>;
@@ -74,7 +74,7 @@ export class MapPanel {
       {
         enableScripts: true,
         retainContextWhenHidden: true,
-        localResourceRoots: [args.extUri, args.webviewDistUri, args.webviewVendorUri],
+        localResourceRoots: [args.extUri, args.webviewAssetsUri],
       },
     );
 
@@ -82,8 +82,7 @@ export class MapPanel {
     panel.webview.html = getWebviewHtml({
       webview: panel.webview,
       extUri: args.extUri,
-      webviewDistUri: args.webviewDistUri,
-      webviewVendorUri: args.webviewVendorUri,
+      webviewAssetsUri: args.webviewAssetsUri,
       title: args.title,
     });
     MapPanel.panels.set(args.key, mp);

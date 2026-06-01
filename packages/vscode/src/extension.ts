@@ -13,15 +13,15 @@ export function activate(context: vscode.ExtensionContext): void {
 
   const tokenManager = new TokenManager(context.secrets);
 
-  // The webview package's bundle + Mapbox CSP vendor files live as siblings
-  // of the extension package, so we resolve them relative to extension URI.
-  const webviewDistUri = vscode.Uri.joinPath(context.extensionUri, '..', 'webview', 'dist');
-  const webviewVendorUri = vscode.Uri.joinPath(context.extensionUri, '..', 'webview', 'vendor');
+  // Webview app bundle + Mapbox CSP-strict vendor files are bundled into
+  // this extension's own `dist/webview/` directory by the esbuild build
+  // step (see `esbuild.config.mjs` → `copyWebviewAssets`). This works
+  // identically in dev (F5) and in an installed VSIX.
+  const webviewAssetsUri = vscode.Uri.joinPath(context.extensionUri, 'dist', 'webview');
 
   const ctx: ViewInMapsCtx = {
     extUri: context.extensionUri,
-    webviewDistUri,
-    webviewVendorUri,
+    webviewAssetsUri,
     tokenManager,
     logger,
   };
