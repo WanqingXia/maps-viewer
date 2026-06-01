@@ -202,8 +202,8 @@ maps-viewer/  (pnpm workspace root)
 
 | # | Phase | Description | Status | Parallel | Depends | PRP Plan |
 |---|-------|-------------|--------|----------|---------|----------|
-| 0 | Repo scaffold | pnpm workspaces, TS config, package boundaries, build pipeline, VS Code extension shell | complete | - | - | [phase-0-repo-scaffold.plan.md](../plans/phase-0-repo-scaffold.plan.md) |
-| 1 | MVP — Single-file viewer | Right-click command + webview + Mapbox + basemap toggle + hover popup + BYO token | complete | - | 0 | [phase-1-mvp-single-file-viewer.plan.md](../plans/completed/phase-1-mvp-single-file-viewer.plan.md) |
+| 0 | Repo scaffold | pnpm workspaces, TS config, package boundaries, build pipeline, VS Code extension shell | complete | - | - | [completed/phase-0-repo-scaffold.plan.md](../plans/completed/phase-0-repo-scaffold.plan.md) |
+| 1 | MVP — Single-file viewer | Right-click command + webview + Mapbox + basemap toggle + hover popup + BYO token | complete | - | 0 | [completed/phase-1-mvp-single-file-viewer.plan.md](../plans/completed/phase-1-mvp-single-file-viewer.plan.md) · [report](../reports/phase-1-mvp-single-file-viewer-report.md) |
 | 2 | Multi-file layers + styling | Multiple files in one map, 20-color palette, view/hide/rename/delete, stroke width, color picker | pending | - | 1 | [phase-2-multi-file-layers-styling.plan.md](../plans/phase-2-multi-file-layers-styling.plan.md) |
 | 3 | Maps Manager + persistence | Activity-bar tree view, save/open named projects, layer state restored | pending | with 4 | 2 | [phase-3-maps-manager-persistence.plan.md](../plans/phase-3-maps-manager-persistence.plan.md) |
 | 4 | Discovery features | Primary key, Locate, country bbox, small-feature-as-dot | pending | with 3 | 2 | [phase-4-discovery-features.plan.md](../plans/phase-4-discovery-features.plan.md) |
