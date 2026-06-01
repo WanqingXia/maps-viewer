@@ -1,0 +1,95 @@
+:root {
+  color-scheme: dark light;
+  --mv-bg: var(--vscode-editor-background, #1e1e1e);
+  --mv-fg: var(--vscode-editor-foreground, #d4d4d4);
+  --mv-border: var(--vscode-panel-border, rgba(128,128,128,0.35));
+  --mv-overlay-bg: var(--vscode-editorWidget-background, rgba(30,30,30,0.92));
+  --mv-overlay-fg: var(--vscode-editorWidget-foreground, #d4d4d4);
+  --mv-accent: var(--vscode-focusBorder, #007fd4);
+}
+
+html, body, #map {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  width: 100%;
+  background: var(--mv-bg);
+  color: var(--mv-fg);
+  font-family: var(--vscode-font-family, -apple-system, system-ui, sans-serif);
+  font-size: 12px;
+  overflow: hidden;
+}
+
+.mv-basemap-toggle {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  display: inline-flex;
+  background: var(--mv-overlay-bg);
+  border: 1px solid var(--mv-border);
+  border-radius: 4px;
+  overflow: hidden;
+  z-index: 10;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+}
+
+.mv-basemap-toggle button {
+  appearance: none;
+  background: transparent;
+  color: var(--mv-overlay-fg);
+  border: none;
+  padding: 6px 10px;
+  font: inherit;
+  cursor: pointer;
+}
+
+.mv-basemap-toggle button[aria-pressed="true"] {
+  background: var(--mv-accent);
+  color: white;
+}
+
+.mv-basemap-toggle button:focus-visible {
+  outline: 2px solid var(--mv-accent);
+  outline-offset: -2px;
+}
+
+.mv-props-popup {
+  position: absolute;
+  max-width: 320px;
+  max-height: 60vh;
+  overflow: auto;
+  background: var(--mv-overlay-bg);
+  color: var(--mv-overlay-fg);
+  border: 1px solid var(--mv-border);
+  border-radius: 4px;
+  padding: 8px 10px;
+  z-index: 9;
+  pointer-events: none;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.mv-props-popup dl {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 2px 8px;
+  margin: 0;
+}
+.mv-props-popup dt {
+  font-weight: 600;
+  opacity: 0.75;
+}
+.mv-props-popup dd {
+  margin: 0;
+  word-break: break-word;
+}
+.mv-props-empty {
+  opacity: 0.7;
+  font-style: italic;
+}
+.mv-props-more {
+  margin-top: 4px;
+  opacity: 0.7;
+  font-size: 10px;
+}

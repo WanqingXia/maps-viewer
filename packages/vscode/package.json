@@ -1,0 +1,74 @@
+{
+  "name": "maps-viewer",
+  "displayName": "Maps Viewer",
+  "description": "View GeoJSON files on a Mapbox map directly in VS Code.",
+  "version": "0.0.1",
+  "publisher": "PLACEHOLDER",
+  "private": true,
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "main": "./dist/extension.cjs",
+  "activationEvents": [
+    "onCommand:mapsViewer.viewInMaps",
+    "onCommand:mapsViewer.setMapboxToken"
+  ],
+  "contributes": {
+    "commands": [
+      { "command": "mapsViewer.about", "title": "Maps Viewer: About" },
+      { "command": "mapsViewer.viewInMaps", "title": "View in Maps", "category": "Maps Viewer" },
+      { "command": "mapsViewer.setMapboxToken", "title": "Set Mapbox Token…", "category": "Maps Viewer" }
+    ],
+    "menus": {
+      "explorer/context": [
+        {
+          "command": "mapsViewer.viewInMaps",
+          "when": "resourceExtname == .geojson",
+          "group": "navigation@10"
+        }
+      ],
+      "editor/context": [
+        {
+          "command": "mapsViewer.viewInMaps",
+          "when": "resourceExtname == .geojson",
+          "group": "navigation@10"
+        }
+      ],
+      "editor/title/context": [
+        {
+          "command": "mapsViewer.viewInMaps",
+          "when": "resourceExtname == .geojson",
+          "group": "navigation@10"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Maps Viewer",
+      "properties": {
+        "mapsViewer.defaultBasemap": {
+          "type": "string",
+          "enum": ["standard", "satellite"],
+          "default": "standard",
+          "description": "Basemap shown when a map first opens."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "build": "node esbuild.config.mjs",
+    "watch": "node esbuild.config.mjs --watch",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "package": "vsce package --no-dependencies --allow-missing-repository"
+  },
+  "dependencies": {
+    "@maps-viewer/shared": "workspace:*",
+    "@maps-viewer/core": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/geojson": "^7946.0.14",
+    "@types/vscode": "^1.85.0",
+    "@vscode/vsce": "^2.24.0",
+    "esbuild": "^0.20.0"
+  }
+}
