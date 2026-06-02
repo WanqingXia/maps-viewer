@@ -12,9 +12,8 @@ import type { ColorHex } from './colors.js';
  * Conventions:
  *   - `Layer.id` is unique across the panel; webview-side feature ids are
  *     scoped per-layer via Mapbox's `generateId: true`.
- *   - `Layer.color` is a per-layer color; when grouped, it normally tracks
- *     the group's color via the `setGroupColor` cascade, but the user can
- *     break the cascade by setting `setLayerColor` directly.
+ *   - `Layer.color` is the render color. Grouped layers track their group
+ *     color and do not expose independent color controls in the UI.
  *   - `Layer.strokeWidth` is the line/circle stroke width (0–50; the
  *     reducer clamps).
  *   - `Layer.visible` is independent of group visibility; both must be
@@ -63,9 +62,16 @@ export type LayerAction =
   | { readonly type: 'renameGroup'; readonly groupId: string; readonly name: string }
   | { readonly type: 'setGroupColor'; readonly groupId: string; readonly color: ColorHex }
   | { readonly type: 'setGroupVisible'; readonly groupId: string; readonly visible: boolean }
-  | { readonly type: 'deleteGroup'; readonly groupId: string }
+  | { readonly type: 'deleteGroup'; readonly groupId: string; readonly restoredColors?: Readonly<Record<string, ColorHex>> }
   | { readonly type: 'addToGroup'; readonly layerId: string; readonly groupId: string }
-  | { readonly type: 'removeFromGroup'; readonly layerId: string };
+  | { readonly type: 'removeFromGroup'; readonly layerId: string; readonly color?: ColorHex }
+  | {
+      readonly type: 'moveLayer';
+      readonly layerId: string;
+      readonly targetGroupId: string | null;
+      readonly targetIndex: number;
+      readonly color?: ColorHex;
+    };
 
 /** Subset of LayerAction that the webview UI can emit (no addLayer — file IO is host-side). */
 export type UserAction = Exclude<LayerAction, { type: 'addLayer' }>;

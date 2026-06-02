@@ -1,4 +1,4 @@
-import { AUTO_PALETTE, type CountryBbox, type CountryCode, type LayerFeatureMetaMap, type LayerState, type Layer, type Group, type PrimaryKeyMap, type UserAction } from '@maps-viewer/shared';
+import { AUTO_PALETTE, type ColorHex, type CountryBbox, type CountryCode, type LayerFeatureMetaMap, type LayerState, type Layer, type PrimaryKeyMap, type UserAction } from '@maps-viewer/shared';
 import { mountLayerRow, type LayerRow, type LayerRowOptions } from './layer-row.js';
 import { mountGroupHeader, type GroupHeader } from './group-header.js';
 
@@ -44,9 +44,8 @@ export function mountLayersPanel(
   const groupBtn = document.createElement('button');
   groupBtn.type = 'button';
   groupBtn.className = 'mv-layers-panel__group';
-  groupBtn.textContent = 'Group';
-  groupBtn.disabled = true;
-  groupBtn.title = 'Group selected layers';
+  groupBtn.textContent = 'New Group';
+  groupBtn.title = 'Create a new group';
   const country = document.createElement('select');
   country.className = 'mv-layers-panel__country';
   country.setAttribute('aria-label', 'Country scope');
@@ -64,11 +63,7 @@ export function mountLayersPanel(
 
   const layerRows = new Map<string, LayerRow>();
   const groupHeaders = new Map<string, GroupHeader>();
-  const selectedLayerIds = new Set<string>();
-
   groupBtn.addEventListener('click', () => {
-    const layerIds = [...selectedLayerIds];
-    if (layerIds.length < 2) return;
     const state = lastUpdate.state;
     const group = {
       id: `group-${Date.now()}`,
@@ -76,8 +71,7 @@ export function mountLayersPanel(
       color: AUTO_PALETTE[state.groups.length % AUTO_PALETTE.length]!,
       visible: true,
     };
-    onAction({ type: 'createGroup', group, layerIds });
-    selectedLayerIds.clear();
+    onAction({ type: 'createGroup', group, layerIds: [] });
   });
 
   country.addEventListener('change', () => {
@@ -90,17 +84,12 @@ export function mountLayersPanel(
     lastUpdate = options;
     const { state } = options;
     count.textContent = `(${state.layers.length})`;
-    groupBtn.disabled = selectedLayerIds.size < 2;
     renderCountries(options);
 
-    // Build the new DOM order: groups in order of first appearance, then
-    // ungrouped layers (in array order).
-    const groupOrder: string[] = [];
     const layersByGroup = new Map<string | null, Layer[]>();
     layersByGroup.set(null, []);
     for (const layer of state.layers) {
       const key = layer.groupId;
-      if (key !== null && !groupOrder.includes(key)) groupOrder.push(key);
       const bucket = layersByGroup.get(key) ?? [];
       bucket.push(layer);
       layersByGroup.set(key, bucket);
@@ -119,18 +108,17 @@ export function mountLayersPanel(
 
     body.innerHTML = '';
 
-    // Groups first
-    for (const groupId of groupOrder) {
-      const group = state.groups.find((g) => g.id === groupId);
-      if (!group) continue;
+    // Groups first, including empty groups that can receive layers.
+    for (const group of state.groups) {
       let head = groupHeaders.get(group.id);
       if (!head) {
-        head = mountGroupHeader(group, onAction);
+        head = mountGroupHeader(group, (action) => onAction(withComputedColors(action)));
         groupHeaders.set(group.id, head);
       } else {
         head.update(group);
       }
       body.appendChild(head.element);
+      wireDropTarget(head.element, group.id, 0);
       const members = layersByGroup.get(group.id) ?? [];
       for (const layer of members) {
         renderLayerRow(layer);
@@ -139,11 +127,12 @@ export function mountLayersPanel(
 
     // Then ungrouped layers
     const ungrouped = layersByGroup.get(null) ?? [];
-    if (ungrouped.length > 0) {
+    if (ungrouped.length > 0 || state.groups.length > 0) {
       const ungroupedHeader = document.createElement('div');
       ungroupedHeader.className = 'mv-layers-panel__ungrouped-label';
       ungroupedHeader.textContent = '(ungrouped)';
-      if (groupOrder.length > 0) body.appendChild(ungroupedHeader);
+      wireDropTarget(ungroupedHeader, null, ungroupedStartIndex());
+      body.appendChild(ungroupedHeader);
       for (const layer of ungrouped) renderLayerRow(layer);
     }
 
@@ -153,12 +142,6 @@ export function mountLayersPanel(
         row = mountLayerRow(
           toRowOptions(layer, options),
           onAction,
-          (layerId, selected) => {
-            if (selected) selectedLayerIds.add(layerId);
-            else selectedLayerIds.delete(layerId);
-            groupBtn.disabled = selectedLayerIds.size < 2;
-            update(lastUpdate);
-          },
           onPrimaryKey,
           onLocateFeature,
           onFeatureVisible,
@@ -167,6 +150,8 @@ export function mountLayersPanel(
       } else {
         row.update(toRowOptions(layer, options));
       }
+      const targetIndex = state.layers.filter((l) => l.groupId === layer.groupId).findIndex((l) => l.id === layer.id) + 1;
+      wireDropTarget(row.element, layer.groupId, targetIndex);
       body.appendChild(row.element);
     }
   }
@@ -188,7 +173,6 @@ export function mountLayersPanel(
   function toRowOptions(layer: Layer, options: LayersPanelUpdate): LayerRowOptions {
     return {
       layer,
-      selected: selectedLayerIds.has(layer.id),
       primaryKey: options.primaryKeyByLayer[layer.id] ?? null,
       meta: options.layerFeatureMeta[layer.id],
       hiddenFeatureIds: options.hiddenFeatureIds.get(layer.id) ?? new Set(),
@@ -203,6 +187,112 @@ export function mountLayersPanel(
         .map((item) => `<option value="${escapeAttr(item.code)}">${escapeHtml(item.name)}</option>`),
     ].join('');
     country.value = value;
+  }
+
+  function wireDropTarget(element: HTMLElement, targetGroupId: string | null, positionInGroup: number): void {
+    element.dataset.dropGroupId = targetGroupId ?? '';
+    element.addEventListener('dragover', (event) => {
+      if (!event.dataTransfer?.types.includes('application/x-maps-viewer-layer')) return;
+      event.preventDefault();
+      element.dataset.dragOver = 'true';
+    });
+    element.addEventListener('dragleave', () => {
+      element.dataset.dragOver = 'false';
+    });
+    element.addEventListener('drop', (event) => {
+      event.preventDefault();
+      element.dataset.dragOver = 'false';
+      const layerId = event.dataTransfer?.getData('application/x-maps-viewer-layer')
+        || event.dataTransfer?.getData('text/plain');
+      if (!layerId) return;
+      const action = moveAction(layerId, targetGroupId, positionInGroup);
+      if (action) onAction(action);
+    });
+  }
+
+  function moveAction(layerId: string, targetGroupId: string | null, positionInGroup: number): UserAction | null {
+    const layer = lastUpdate.state.layers.find((l) => l.id === layerId);
+    if (!layer) return null;
+    if (layer.groupId === targetGroupId) {
+      const currentGroupIndex = lastUpdate.state.layers
+        .filter((l) => l.groupId === targetGroupId)
+        .findIndex((l) => l.id === layerId);
+      if (positionInGroup === currentGroupIndex || positionInGroup === currentGroupIndex + 1) return null;
+    }
+    const color = targetGroupId
+      ? lastUpdate.state.groups.find((g) => g.id === targetGroupId)?.color ?? layer.color
+      : nextUnusedColor(lastUpdate.state, layerId);
+    const remaining = lastUpdate.state.layers.filter((l) => l.id !== layerId);
+    const targetIndex = targetIndexForGroupPosition(remaining, targetGroupId, positionInGroup);
+    return { type: 'moveLayer', layerId, targetGroupId, targetIndex, color };
+  }
+
+  function targetIndexForGroupPosition(
+    layers: ReadonlyArray<Layer>,
+    targetGroupId: string | null,
+    positionInGroup: number,
+  ): number {
+    const groupMembers = layers.filter((l) => l.groupId === targetGroupId);
+    if (positionInGroup <= 0) {
+      const first = layers.findIndex((l) => l.groupId === targetGroupId);
+      return first >= 0 ? first : insertionPointForEmptyGroup(layers, targetGroupId);
+    }
+    if (positionInGroup >= groupMembers.length) {
+      const last = lastIndexOfGroup(layers, targetGroupId);
+      return last >= 0 ? last + 1 : insertionPointForEmptyGroup(layers, targetGroupId);
+    }
+    const target = groupMembers[positionInGroup];
+    return target ? layers.findIndex((l) => l.id === target.id) : layers.length;
+  }
+
+  function insertionPointForEmptyGroup(layers: ReadonlyArray<Layer>, targetGroupId: string | null): number {
+    if (targetGroupId === null) return layers.length;
+    const groupIndex = lastUpdate.state.groups.findIndex((g) => g.id === targetGroupId);
+    const previousGroupIds = new Set(lastUpdate.state.groups.slice(0, groupIndex).map((g) => g.id));
+    const afterPreviousGroups = lastIndexMatching(layers, (l) => l.groupId !== null && previousGroupIds.has(l.groupId));
+    return afterPreviousGroups + 1;
+  }
+
+  function lastIndexOfGroup(layers: ReadonlyArray<Layer>, groupId: string | null): number {
+    return lastIndexMatching(layers, (l) => l.groupId === groupId);
+  }
+
+  function lastIndexMatching(layers: ReadonlyArray<Layer>, predicate: (layer: Layer) => boolean): number {
+    for (let i = layers.length - 1; i >= 0; i--) {
+      if (predicate(layers[i]!)) return i;
+    }
+    return -1;
+  }
+
+  function ungroupedStartIndex(): number {
+    return lastUpdate.state.layers.filter((l) => l.groupId === null).length;
+  }
+
+  function withComputedColors(action: UserAction): UserAction {
+    if (action.type !== 'deleteGroup') return action;
+    const restoredColors: Record<string, ColorHex> = {};
+    const members = lastUpdate.state.layers.filter((l) => l.groupId === action.groupId);
+    let state = lastUpdate.state;
+    for (const member of members) {
+      const color = nextUnusedColor(state, member.id, restoredColors);
+      restoredColors[member.id] = color;
+      state = { ...state, layers: state.layers.map((l) => l.id === member.id ? { ...l, color } : l) };
+    }
+    return { ...action, restoredColors };
+  }
+
+  function nextUnusedColor(
+    state: LayerState,
+    layerId: string,
+    reserved: Readonly<Record<string, ColorHex>> = {},
+  ): ColorHex {
+    const used = new Set<ColorHex>();
+    for (const group of state.groups) used.add(group.color);
+    for (const layer of state.layers) {
+      if (layer.id !== layerId && layer.groupId === null) used.add(layer.color);
+    }
+    for (const color of Object.values(reserved)) used.add(color);
+    return AUTO_PALETTE.find((color) => !used.has(color)) ?? AUTO_PALETTE[0]!;
   }
 }
 

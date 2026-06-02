@@ -146,7 +146,9 @@ export function reduce(state: LayerState, action: LayerAction): LayerState {
       const groups = state.groups.filter((g) => g.id !== action.groupId);
       if (groups.length === state.groups.length) return state;
       const layers = state.layers.map((l) =>
-        l.groupId === action.groupId ? { ...l, groupId: null } : l,
+        l.groupId === action.groupId
+          ? { ...l, groupId: null, color: action.restoredColors?.[l.id] ?? l.color }
+          : l,
       );
       return { layers, groups };
     }
@@ -169,9 +171,32 @@ export function reduce(state: LayerState, action: LayerAction): LayerState {
       const nextLayers = state.layers.map((l) => {
         if (l.id !== action.layerId || l.groupId === null) return l;
         changed = true;
-        return { ...l, groupId: null };
+        return { ...l, groupId: null, color: action.color ?? l.color };
       });
       return changed ? { ...state, layers: nextLayers } : state;
+    }
+
+    case 'moveLayer': {
+      const currentIndex = state.layers.findIndex((l) => l.id === action.layerId);
+      if (currentIndex < 0) return state;
+      const targetGroup = action.targetGroupId
+        ? state.groups.find((g) => g.id === action.targetGroupId)
+        : undefined;
+      if (action.targetGroupId && !targetGroup) return state;
+
+      const remaining = state.layers.filter((l) => l.id !== action.layerId);
+      const nextLayer = {
+        ...state.layers[currentIndex]!,
+        groupId: action.targetGroupId,
+        color: targetGroup?.color ?? action.color ?? state.layers[currentIndex]!.color,
+      };
+      const targetIndex = clamp(action.targetIndex, 0, remaining.length);
+      const layers = [
+        ...remaining.slice(0, targetIndex),
+        nextLayer,
+        ...remaining.slice(targetIndex),
+      ];
+      return { ...state, layers };
     }
 
     default: {

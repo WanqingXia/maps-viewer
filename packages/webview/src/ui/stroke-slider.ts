@@ -42,6 +42,7 @@ export function mountStrokeSlider(
 
   let frame = 0;
   let pendingValue = initial;
+  let pointerDragging = false;
 
   const flush = (): void => {
     frame = 0;
@@ -61,6 +62,31 @@ export function mountStrokeSlider(
     commit(Number(input.value));
   });
 
+  input.addEventListener('pointerdown', (event) => {
+    pointerDragging = true;
+    input.setPointerCapture(event.pointerId);
+    commit(valueFromPointer(event));
+    event.preventDefault();
+  });
+
+  input.addEventListener('pointermove', (event) => {
+    if (!pointerDragging) return;
+    commit(valueFromPointer(event));
+    event.preventDefault();
+  });
+
+  input.addEventListener('pointerup', (event) => {
+    if (!pointerDragging) return;
+    pointerDragging = false;
+    commit(valueFromPointer(event));
+    input.releasePointerCapture(event.pointerId);
+    event.preventDefault();
+  });
+
+  input.addEventListener('pointercancel', () => {
+    pointerDragging = false;
+  });
+
   number.addEventListener('input', () => {
     commit(Number(number.value));
   });
@@ -71,6 +97,7 @@ export function mountStrokeSlider(
   return {
     element: wrap,
     setValue(v: number) {
+      if (pointerDragging) return;
       if (Number(input.value) === v) return;
       const next = clamp(v);
       input.value = String(next);
@@ -83,6 +110,13 @@ export function mountStrokeSlider(
       wrap.remove();
     },
   };
+
+  function valueFromPointer(event: PointerEvent): number {
+    const rect = input.getBoundingClientRect();
+    if (rect.width <= 0) return Number(input.value);
+    const ratio = Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width));
+    return STROKE_WIDTH_MIN + ratio * (STROKE_WIDTH_MAX - STROKE_WIDTH_MIN);
+  }
 }
 
 function clamp(value: number): number {

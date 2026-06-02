@@ -42,6 +42,7 @@ declare global {
     removeFeatureState(target: { source: string; id?: string | number }, key?: string): void;
     queryRenderedFeatures(point: [number, number] | Array<[number, number]>, options?: { layers?: string[] }): Array<MapboxQueriedFeature>;
     fitBounds(bounds: MapboxLngLatBoundsInstance | [[number, number], [number, number]], options?: Record<string, unknown>): void;
+    setMaxBounds(bounds: [[number, number], [number, number]] | null): void;
     jumpTo(options: Record<string, unknown>): void;
     flyTo(options: Record<string, unknown>): void;
     getCanvas(): HTMLCanvasElement;

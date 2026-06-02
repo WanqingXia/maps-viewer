@@ -53,7 +53,6 @@ export class MapboxMap {
     this.details = mountFeatureDetails(
       container,
       () => this.zoomToSelectedFeature(),
-      () => this.toggleSelectedFeatureVisible(),
     );
     this.toggle = mountBasemapToggle(container, basemap, (next) => this.setBasemap(next));
     this.map.on('error', (e: unknown) => {
@@ -159,7 +158,11 @@ export class MapboxMap {
         return;
       case 'deleteGroup':
         for (const [layerId, layer] of this.layers) {
-          if (layer.groupId === action.groupId) this.layers.set(layerId, { ...layer, groupId: null });
+          if (layer.groupId === action.groupId) {
+            const color = action.restoredColors?.[layerId] ?? layer.color;
+            this.layers.set(layerId, { ...layer, groupId: null, color });
+            this.repaintColor(layerId, color);
+          }
         }
         return;
       case 'addToGroup':
@@ -171,9 +174,19 @@ export class MapboxMap {
       case 'removeFromGroup':
         for (const [layerId, layer] of this.layers) {
           if (layerId !== action.layerId) continue;
-          this.layers.set(layerId, { ...layer, groupId: null });
+          const color = action.color ?? layer.color;
+          this.layers.set(layerId, { ...layer, groupId: null, color });
+          this.repaintColor(layerId, color);
         }
         return;
+      case 'moveLayer': {
+        const layer = this.layers.get(action.layerId);
+        if (!layer) return;
+        const color = action.color ?? layer.color;
+        this.layers.set(action.layerId, { ...layer, groupId: action.targetGroupId, color });
+        this.repaintColor(action.layerId, color);
+        return;
+      }
     }
   }
 
@@ -208,11 +221,12 @@ export class MapboxMap {
    * core into the bundle; mismatched codes fall back to world.
    */
   setCountry(code: CountryCode | null, bbox: readonly [number, number, number, number]): void {
+    const bounds: [[number, number], [number, number]] = [[bbox[0], bbox[1]], [bbox[2], bbox[3]]];
+    this.map.setMaxBounds(code ? expandedBounds(bbox, 1.5) : null);
     this.map.fitBounds(
-      [[bbox[0], bbox[1]], [bbox[2], bbox[3]]],
+      bounds,
       { padding: 40, animate: true, duration: 600 },
     );
-    void code;
   }
 
   /**
@@ -285,7 +299,7 @@ export class MapboxMap {
     else this.hiddenFeatureIds.set(layerId, hidden);
     this.repaintFeatureFilters(layerId);
     if (this.selectedFeature?.layerId === layerId && this.selectedFeature.featureId === featureId) {
-      this.details.setHidden(!visible);
+      this.details.hide();
     }
   }
 
@@ -340,12 +354,10 @@ export class MapboxMap {
     const layer = this.layers.get(layerId);
     if (!layer) return;
     this.selectedFeature = { layerId, featureId: feature.id };
-    const hidden = this.hiddenFeatureIds.get(layerId)?.has(feature.id) ?? false;
     this.details.show({
       layerName: layer.displayName,
       featureId: feature.id,
       properties: feature.properties,
-      hidden,
     });
   }
 
@@ -357,12 +369,6 @@ export class MapboxMap {
     const center = feature ? centerOfGeometry(feature.geometry) : null;
     if (!center) return;
     this.locate(this.selectedFeature.layerId, id, center);
-  }
-
-  private toggleSelectedFeatureVisible(): void {
-    if (!this.selectedFeature) return;
-    const hidden = this.hiddenFeatureIds.get(this.selectedFeature.layerId)?.has(this.selectedFeature.featureId) ?? false;
-    this.setFeatureVisible(this.selectedFeature.layerId, this.selectedFeature.featureId, hidden);
   }
 
   private fitToLayers(): void {
@@ -396,6 +402,28 @@ function boundsOfGeometry(g: GeoJSON.Geometry | null): [number, number, number, 
     if (lat > maxLat) maxLat = lat;
   }
   return isFinite(minLng) ? [minLng, minLat, maxLng, maxLat] : null;
+}
+
+function expandedBounds(
+  bbox: readonly [number, number, number, number],
+  factor: number,
+): [[number, number], [number, number]] {
+  const width = bbox[2] - bbox[0];
+  const height = bbox[3] - bbox[1];
+  const xPad = (width * (factor - 1)) / 2;
+  const yPad = (height * (factor - 1)) / 2;
+  return [
+    [clampLng(bbox[0] - xPad), clampLat(bbox[1] - yPad)],
+    [clampLng(bbox[2] + xPad), clampLat(bbox[3] + yPad)],
+  ];
+}
+
+function clampLng(value: number): number {
+  return Math.max(-180, Math.min(180, value));
+}
+
+function clampLat(value: number): number {
+  return Math.max(-85, Math.min(85, value));
 }
 
 function centerOfGeometry(g: GeoJSON.Geometry | null): [number, number] | null {

@@ -2,14 +2,12 @@ export interface FeatureDetailsModel {
   readonly layerName: string;
   readonly featureId: number | string;
   readonly properties: Record<string, unknown> | null;
-  readonly hidden: boolean;
 }
 
 export interface FeatureDetails {
   element: HTMLElement;
   show(model: FeatureDetailsModel): void;
   hide(): void;
-  setHidden(hidden: boolean): void;
   destroy(): void;
 }
 
@@ -19,7 +17,6 @@ const TRUNCATE_VALUE_AT = 160;
 export function mountFeatureDetails(
   container: HTMLElement,
   onZoom: () => void,
-  onToggleVisible: () => void,
 ): FeatureDetails {
   const root = document.createElement('section');
   root.className = 'mv-feature-details';
@@ -41,11 +38,6 @@ export function mountFeatureDetails(
   zoomBtn.textContent = 'Zoom';
   zoomBtn.addEventListener('click', onZoom);
 
-  const visibleBtn = document.createElement('button');
-  visibleBtn.type = 'button';
-  visibleBtn.className = 'mv-feature-details__button';
-  visibleBtn.addEventListener('click', onToggleVisible);
-
   const closeBtn = document.createElement('button');
   closeBtn.type = 'button';
   closeBtn.className = 'mv-feature-details__close';
@@ -55,19 +47,13 @@ export function mountFeatureDetails(
     root.dataset.visible = 'false';
   });
 
-  actions.append(zoomBtn, visibleBtn, closeBtn);
+  actions.append(zoomBtn, closeBtn);
   header.append(title, actions);
 
   const body = document.createElement('div');
   body.className = 'mv-feature-details__body';
   root.append(header, body);
   container.append(root);
-
-  function setHidden(hidden: boolean): void {
-    root.dataset.hiddenFeature = String(hidden);
-    visibleBtn.textContent = hidden ? 'Show' : 'Hide';
-    visibleBtn.setAttribute('aria-label', hidden ? 'Show selected feature' : 'Hide selected feature');
-  }
 
   return {
     element: root,
@@ -82,13 +68,11 @@ export function mountFeatureDetails(
           return `<div class="mv-feature-details__row"><span>${escapeHtml(key)}</span><strong>${escapeHtml(formatValue(props[key]))}</strong></div>`;
         }).join('');
       }
-      setHidden(model.hidden);
       root.dataset.visible = 'true';
     },
     hide() {
       root.dataset.visible = 'false';
     },
-    setHidden,
     destroy() {
       root.remove();
     },

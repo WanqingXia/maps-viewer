@@ -35,7 +35,7 @@ export function mountPropertiesPopup(container: HTMLElement): PropertiesPopup {
         const rows = shown
           .map(
             (k) =>
-              `<div class="mv-popup__row"><span class="mv-popup__key">${escapeHtml(k)}:</span><span class="mv-popup__value">${escapeHtml(formatValue(safeProps[k]))}</span></div>`,
+              `<div class="mv-popup__row"><span class="mv-popup__key">${escapeHtml(k)}</span><strong class="mv-popup__value">${escapeHtml(formatValue(safeProps[k]))}</strong></div>`,
           )
           .join('');
         const more = keys.length > MAX_PROPS_SHOWN

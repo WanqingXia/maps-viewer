@@ -10,60 +10,49 @@ export interface LayerRow {
 
 export interface LayerRowOptions {
   readonly layer: Layer;
-  readonly selected: boolean;
   readonly primaryKey: string | null;
   readonly meta: LayerFeatureMeta | undefined;
   readonly hiddenFeatureIds: ReadonlySet<number | string>;
 }
 
-/** Render one layer row inside the layers panel. */
 export function mountLayerRow(
   options: LayerRowOptions,
   onAction: (a: UserAction) => void,
-  onSelect: (layerId: string, selected: boolean) => void,
   onPrimaryKey: (layerId: string, key: string | null) => void,
   onLocateFeature: (layerId: string, featureId: number) => void,
   onFeatureVisible: (layerId: string, featureId: number, visible: boolean) => void,
 ): LayerRow {
-  let current: Layer = options.layer;
+  let current = options.layer;
   let currentOptions = options;
+  let expanded = false;
+  let query = '';
+  let sortAsc = true;
 
   const row = document.createElement('div');
   row.className = 'mv-layer-row';
   row.setAttribute('role', 'listitem');
-  row.dataset.layerId = options.layer.id;
+  row.dataset.layerId = current.id;
 
-  const select = document.createElement('input');
-  select.type = 'checkbox';
-  select.className = 'mv-layer-row__select';
-  select.title = 'Select for grouping';
-  select.setAttribute('aria-label', `Select ${options.layer.displayName} for grouping`);
+  const move = iconButton('mv-layer-row__move', 'Drag layer', '↕');
+  move.draggable = true;
+  move.title = 'Drag layer';
 
-  // 1. Visibility toggle
-  const visBtn = document.createElement('button');
-  visBtn.type = 'button';
-  visBtn.className = 'mv-layer-row__vis';
-  visBtn.title = 'Toggle visibility';
-  visBtn.setAttribute('aria-label', `Toggle visibility of layer ${options.layer.displayName}`);
+  const visBtn = iconButton('mv-layer-row__vis', `Toggle visibility of layer ${current.displayName}`, '');
 
-  // 2. Color swatch (opens picker)
-  const swatch = document.createElement('button');
-  swatch.type = 'button';
-  swatch.className = 'mv-layer-row__color';
+  const swatch = iconButton('mv-layer-row__color', `Change color of layer ${current.displayName}`, '');
   swatch.title = 'Change color';
-  swatch.setAttribute('aria-label', `Change color of layer ${options.layer.displayName}`);
   swatch.setAttribute('aria-haspopup', 'listbox');
 
-  // 3. Name (click to rename)
   const name = document.createElement('input');
   name.type = 'text';
   name.className = 'mv-layer-row__name';
   name.spellcheck = false;
-  name.title = 'Rename layer';
+  name.title = current.displayName;
   name.setAttribute('aria-label', 'Layer name');
 
-  // 4. Stroke slider chip (collapsible)
-  const stroke = mountStrokeSlider(options.layer.strokeWidth, (width) =>
+  const delBtn = iconButton('mv-layer-row__delete', `Remove layer ${current.displayName}`, '×');
+
+  const stroke = mountStrokeSlider(current.strokeWidth, (width) =>
     onAction({ type: 'setLayerStrokeWidth', layerId: current.id, width }),
   );
   stroke.element.classList.add('mv-layer-row__stroke');
@@ -73,62 +62,52 @@ export function mountLayerRow(
   pk.title = 'Primary key';
   pk.setAttribute('aria-label', 'Primary key');
 
-  const feature = document.createElement('select');
-  feature.className = 'mv-layer-row__feature';
-  feature.title = 'Feature by primary key';
-  feature.setAttribute('aria-label', 'Feature by primary key');
+  const expandBtn = iconButton('mv-layer-row__expand', 'Show feature records', 'Records ▾');
 
-  const featureVis = document.createElement('button');
-  featureVis.type = 'button';
-  featureVis.className = 'mv-layer-row__feature-vis';
-  featureVis.title = 'Toggle selected feature visibility';
-  featureVis.setAttribute('aria-label', 'Toggle selected feature visibility');
+  const records = document.createElement('div');
+  records.className = 'mv-layer-row__records';
+  records.dataset.visible = 'false';
 
-  const zoomBtn = document.createElement('button');
-  zoomBtn.type = 'button';
-  zoomBtn.className = 'mv-layer-row__feature-zoom';
-  zoomBtn.textContent = 'Zoom';
-  zoomBtn.setAttribute('aria-label', 'Zoom to selected feature');
+  const recordsToolbar = document.createElement('div');
+  recordsToolbar.className = 'mv-layer-row__records-toolbar';
+  const search = document.createElement('input');
+  search.type = 'search';
+  search.className = 'mv-layer-row__records-search';
+  search.placeholder = 'Search records';
+  search.setAttribute('aria-label', 'Search records');
+  const sortBtn = iconButton('mv-layer-row__records-sort', 'Sort records', 'A→Z');
+  recordsToolbar.append(search, sortBtn);
 
-  // 5. Delete button
-  const delBtn = document.createElement('button');
-  delBtn.type = 'button';
-  delBtn.className = 'mv-layer-row__delete';
-  delBtn.title = 'Remove layer';
-  delBtn.textContent = '✕';
-  delBtn.setAttribute('aria-label', `Remove layer ${options.layer.displayName}`);
+  const recordsList = document.createElement('div');
+  recordsList.className = 'mv-layer-row__records-list';
+  records.append(recordsToolbar, recordsList);
 
-  row.appendChild(select);
-  row.appendChild(visBtn);
-  row.appendChild(swatch);
-  row.appendChild(name);
-  row.appendChild(stroke.element);
-  row.appendChild(delBtn);
-  row.appendChild(pk);
-  row.appendChild(feature);
-  row.appendChild(featureVis);
-  row.appendChild(zoomBtn);
+  row.append(move, visBtn, swatch, name, delBtn, stroke.element, pk, expandBtn, records);
 
-  // Color picker is a singleton per row (lazy mount)
   const picker = mountColorPicker((color) =>
     onAction({ type: 'setLayerColor', layerId: current.id, color }),
   );
 
-  // === wiring ===
-  select.addEventListener('change', () => {
-    onSelect(current.id, select.checked);
+  move.addEventListener('dragstart', (e) => {
+    e.dataTransfer?.setData('text/plain', current.id);
+    e.dataTransfer?.setData('application/x-maps-viewer-layer', current.id);
+    if (e.dataTransfer) e.dataTransfer.effectAllowed = 'move';
+    row.dataset.dragging = 'true';
+  });
+  move.addEventListener('dragend', () => {
+    row.dataset.dragging = 'false';
   });
   visBtn.addEventListener('click', () => {
     onAction({ type: 'setLayerVisible', layerId: current.id, visible: !current.visible });
   });
   swatch.addEventListener('click', (e) => {
     e.stopPropagation();
+    if (current.groupId !== null) return;
     picker.open(swatch);
   });
   name.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') {
-      (e.target as HTMLInputElement).blur();
-    } else if (e.key === 'Escape') {
+    if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+    else if (e.key === 'Escape') {
       name.value = current.displayName;
       (e.target as HTMLInputElement).blur();
     }
@@ -137,49 +116,24 @@ export function mountLayerRow(
     if (name.value.trim() === current.displayName) return;
     onAction({ type: 'renameLayer', layerId: current.id, name: name.value });
   });
-  delBtn.addEventListener('click', () => {
-    onAction({ type: 'removeLayer', layerId: current.id });
-  });
+  delBtn.addEventListener('click', () => onAction({ type: 'removeLayer', layerId: current.id }));
   pk.addEventListener('change', () => {
     const value = pk.value === '' ? null : pk.value;
     onPrimaryKey(current.id, value);
   });
-  feature.addEventListener('change', () => {
-    const id = selectedFeatureId();
-    if (id !== null) onLocateFeature(current.id, id);
+  expandBtn.addEventListener('click', () => {
+    expanded = !expanded;
+    renderRecords();
   });
-  zoomBtn.addEventListener('click', () => {
-    const id = selectedFeatureId();
-    if (id !== null) onLocateFeature(current.id, id);
+  search.addEventListener('input', () => {
+    query = search.value;
+    renderRecords();
   });
-  featureVis.addEventListener('click', () => {
-    const id = selectedFeatureId();
-    if (id === null) return;
-    onFeatureVisible(current.id, id, currentOptions.hiddenFeatureIds.has(id));
+  sortBtn.addEventListener('click', () => {
+    sortAsc = !sortAsc;
+    renderRecords();
   });
 
-  function update(nextOptions: LayerRowOptions): void {
-    currentOptions = nextOptions;
-    const next = nextOptions.layer;
-    current = next;
-    row.dataset.visible = String(next.visible);
-    row.dataset.selected = String(nextOptions.selected);
-    select.checked = nextOptions.selected;
-    select.setAttribute('aria-label', `Select ${next.displayName} for grouping`);
-    visBtn.setAttribute('aria-pressed', String(next.visible));
-    visBtn.setAttribute('aria-label', `Toggle visibility of layer ${next.displayName}`);
-    visBtn.innerHTML = eyeIcon(next.visible);
-    swatch.style.background = next.color;
-    swatch.setAttribute('aria-label', `Change color of layer ${next.displayName}`);
-    delBtn.setAttribute('aria-label', `Remove layer ${next.displayName}`);
-    if (document.activeElement !== name) {
-      name.value = next.displayName;
-      name.title = next.displayName;
-    }
-    stroke.setValue(next.strokeWidth);
-    renderPkOptions(nextOptions);
-    renderFeatureOptions(nextOptions);
-  }
   update(options);
 
   return {
@@ -192,37 +146,96 @@ export function mountLayerRow(
     },
   };
 
-  function selectedFeatureId(): number | null {
-    if (feature.value === '') return null;
-    const parsed = Number(feature.value);
-    return Number.isInteger(parsed) ? parsed : null;
+  function update(nextOptions: LayerRowOptions): void {
+    currentOptions = nextOptions;
+    current = nextOptions.layer;
+    row.dataset.layerId = current.id;
+    row.dataset.visible = String(current.visible);
+    row.dataset.grouped = String(current.groupId !== null);
+    visBtn.setAttribute('aria-pressed', String(current.visible));
+    visBtn.setAttribute('aria-label', `Toggle visibility of layer ${current.displayName}`);
+    visBtn.innerHTML = eyeIcon(current.visible);
+    swatch.style.background = current.color;
+    swatch.disabled = current.groupId !== null;
+    swatch.setAttribute('aria-label', current.groupId ? 'Grouped layers use group color' : `Change color of layer ${current.displayName}`);
+    delBtn.setAttribute('aria-label', `Remove layer ${current.displayName}`);
+    if (document.activeElement !== name) {
+      name.value = current.displayName;
+      name.title = current.displayName;
+    }
+    stroke.setValue(current.strokeWidth);
+    renderPkOptions();
+    renderRecords();
   }
 
-  function renderPkOptions(next: LayerRowOptions): void {
-    const active = next.primaryKey ?? '';
-    const keys = next.meta?.propertyKeys ?? [];
+  function renderPkOptions(): void {
+    const active = currentOptions.primaryKey ?? '';
+    const keys = currentOptions.meta?.propertyKeys ?? [];
     pk.disabled = keys.length === 0;
     pk.innerHTML = [
-      '<option value="">PK: none</option>',
+      '<option value="">Primary key: none</option>',
       ...keys.map((key) => `<option value="${escapeAttr(key)}">${escapeHtml(key)}</option>`),
     ].join('');
     pk.value = keys.includes(active) ? active : '';
   }
 
-  function renderFeatureOptions(next: LayerRowOptions): void {
-    const key = next.primaryKey;
-    const items: ReadonlyArray<FeatureOption> = key ? next.meta?.featuresByKey[key] ?? [] : [];
-    feature.disabled = items.length === 0;
-    featureVis.disabled = items.length === 0;
-    zoomBtn.disabled = items.length === 0;
-    feature.innerHTML = items.length === 0
-      ? '<option value="">No PK features</option>'
-      : items.map((item) => `<option value="${item.featureId}">${escapeHtml(item.label)}</option>`).join('');
-    const id = selectedFeatureId();
-    const hidden = id !== null && next.hiddenFeatureIds.has(id);
-    featureVis.innerHTML = eyeIcon(!hidden);
-    featureVis.setAttribute('aria-pressed', String(!hidden));
+  function renderRecords(): void {
+    const key = currentOptions.primaryKey;
+    const allItems = key ? currentOptions.meta?.featuresByKey[key] ?? [] : [];
+    const normalizedQuery = query.trim().toLowerCase();
+    const items = allItems
+      .filter((item) => normalizedQuery === '' || item.label.toLowerCase().includes(normalizedQuery))
+      .sort((a, b) => sortAsc ? a.label.localeCompare(b.label) : b.label.localeCompare(a.label));
+
+    records.dataset.visible = String(expanded);
+    expandBtn.textContent = expanded ? 'Records ▴' : 'Records ▾';
+    expandBtn.disabled = allItems.length === 0;
+    sortBtn.textContent = sortAsc ? 'A→Z' : 'Z→A';
+
+    if (!expanded) return;
+    if (!key) {
+      recordsList.innerHTML = '<div class="mv-layer-row__records-empty">Pick a primary key first.</div>';
+      return;
+    }
+    if (items.length === 0) {
+      recordsList.innerHTML = '<div class="mv-layer-row__records-empty">No matching records.</div>';
+      return;
+    }
+    recordsList.innerHTML = '';
+    for (const item of items) {
+      recordsList.appendChild(recordRow(item));
+    }
   }
+
+  function recordRow(item: FeatureOption): HTMLElement {
+    const hidden = currentOptions.hiddenFeatureIds.has(item.featureId);
+    const root = document.createElement('div');
+    root.className = 'mv-feature-record';
+    root.dataset.hidden = String(hidden);
+
+    const visible = iconButton('mv-feature-record__vis', hidden ? 'Show record' : 'Hide record', eyeIcon(!hidden));
+    visible.addEventListener('click', () => onFeatureVisible(current.id, item.featureId, hidden));
+
+    const label = document.createElement('span');
+    label.className = 'mv-feature-record__value';
+    label.textContent = item.label;
+    label.title = item.label;
+
+    const zoom = iconButton('mv-feature-record__zoom', 'Zoom to record', 'Zoom');
+    zoom.addEventListener('click', () => onLocateFeature(current.id, item.featureId));
+
+    root.append(visible, label, zoom);
+    return root;
+  }
+}
+
+function iconButton(className: string, label: string, content: string): HTMLButtonElement {
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = className;
+  button.setAttribute('aria-label', label);
+  button.innerHTML = content;
+  return button;
 }
 
 function eyeIcon(visible: boolean): string {

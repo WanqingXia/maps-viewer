@@ -174,6 +174,22 @@ describe('reduce: deleteGroup unparents members', () => {
     expect(next.groups).toHaveLength(0);
     expect(next.layers.every((l) => l.groupId === null)).toBe(true);
   });
+
+  it('restores supplied member colors when deleting a group', () => {
+    const s = applyActions(EMPTY_LAYER_STATE, [
+      { type: 'addLayer', layer: makeLayer({ id: 'A' }) },
+      { type: 'addLayer', layer: makeLayer({ id: 'B' }) },
+      { type: 'createGroup', group: makeGroup('g1', YELLOW), layerIds: ['A', 'B'] },
+    ]);
+    const next = reduce(s, {
+      type: 'deleteGroup',
+      groupId: 'g1',
+      restoredColors: { A: BLUE, B: GREEN },
+    });
+    expect(next.layers.find((l) => l.id === 'A')!.color).toBe(BLUE);
+    expect(next.layers.find((l) => l.id === 'B')!.color).toBe(GREEN);
+    expect(next.layers.every((l) => l.groupId === null)).toBe(true);
+  });
 });
 
 describe('reduce: addToGroup / removeFromGroup', () => {
@@ -201,6 +217,54 @@ describe('reduce: addToGroup / removeFromGroup', () => {
       { type: 'removeFromGroup', layerId: 'A' },
     ]);
     expect(s.layers[0]!.groupId).toBeNull();
+  });
+
+  it('removeFromGroup can assign an ungrouped color', () => {
+    const s = applyActions(EMPTY_LAYER_STATE, [
+      { type: 'addLayer', layer: makeLayer({ id: 'A' }) },
+      { type: 'createGroup', group: makeGroup('g1', YELLOW), layerIds: ['A'] },
+      { type: 'removeFromGroup', layerId: 'A', color: GREEN },
+    ]);
+    expect(s.layers[0]!.groupId).toBeNull();
+    expect(s.layers[0]!.color).toBe(GREEN);
+  });
+});
+
+describe('reduce: moveLayer', () => {
+  it('moves a layer into a group and applies the group color', () => {
+    const s = applyActions(EMPTY_LAYER_STATE, [
+      { type: 'addLayer', layer: makeLayer({ id: 'A', color: RED }) },
+      { type: 'addLayer', layer: makeLayer({ id: 'B', color: GREEN }) },
+      { type: 'createGroup', group: makeGroup('g1', YELLOW), layerIds: [] },
+    ]);
+    const next = reduce(s, {
+      type: 'moveLayer',
+      layerId: 'B',
+      targetGroupId: 'g1',
+      targetIndex: 0,
+      color: BLUE,
+    });
+    expect(next.layers[0]!.id).toBe('B');
+    expect(next.layers[0]!.groupId).toBe('g1');
+    expect(next.layers[0]!.color).toBe(YELLOW);
+  });
+
+  it('moves a layer out of a group and applies the supplied color', () => {
+    const s = applyActions(EMPTY_LAYER_STATE, [
+      { type: 'addLayer', layer: makeLayer({ id: 'A', color: RED }) },
+      { type: 'addLayer', layer: makeLayer({ id: 'B', color: GREEN }) },
+      { type: 'createGroup', group: makeGroup('g1', YELLOW), layerIds: ['A'] },
+    ]);
+    const next = reduce(s, {
+      type: 'moveLayer',
+      layerId: 'A',
+      targetGroupId: null,
+      targetIndex: 1,
+      color: BLUE,
+    });
+    expect(next.layers[1]!.id).toBe('A');
+    expect(next.layers[1]!.groupId).toBeNull();
+    expect(next.layers[1]!.color).toBe(BLUE);
   });
 });
 

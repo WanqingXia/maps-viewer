@@ -17,7 +17,9 @@
  *        - setPrimaryKey → tracked locally for future PK-aware UI (no-op in this phase)
  */
 import './styles.css';
+import type { FeatureCollection } from 'geojson';
 import type {
+  FeatureOption,
   HostMessage,
   WebviewMessage,
   UserAction,
@@ -224,10 +226,38 @@ function wirePanelResize(panelContainer: HTMLElement): void {
 function handleApplyAction(msg: Extract<HostMessage, { type: 'applyAction' }>): void {
   if (!map) return;
   map.applyAction(msg.action, msg.layerData);
+  const addedLayerData = msg.action.type === 'addLayer' ? msg.layerData?.[msg.action.layer.id] : undefined;
+  if (msg.action.type === 'addLayer' && addedLayerData) {
+    layerFeatureMeta = {
+      ...layerFeatureMeta,
+      [msg.action.layer.id]: buildLayerMeta(addedLayerData),
+    };
+  }
   if (currentState) {
     currentState = reduceLocal(currentState, msg.action);
     updatePanel();
   }
+}
+
+function buildLayerMeta(fc: FeatureCollection): LayerFeatureMetaMap[string] {
+  const keys = new Set<string>();
+  for (const feature of fc.features) {
+    const props = feature.properties;
+    if (!props) continue;
+    for (const key of Object.keys(props)) keys.add(key);
+  }
+  const propertyKeys = [...keys].sort((a, b) => a.localeCompare(b));
+  const featuresByKey: Record<string, FeatureOption[]> = {};
+  for (const key of propertyKeys) {
+    const values: FeatureOption[] = [];
+    for (let i = 0; i < fc.features.length; i++) {
+      const value = fc.features[i]?.properties?.[key];
+      if (value === undefined || value === null) continue;
+      values.push({ featureId: i, label: String(value) });
+    }
+    featuresByKey[key] = values;
+  }
+  return { propertyKeys, featuresByKey };
 }
 
 const WORLD_BBOX: [number, number, number, number] = [-180, -85, 180, 85];
@@ -305,7 +335,7 @@ function reduceLocal(state: LayerState, action: ApplyActionPayload): LayerState 
       };
     case 'deleteGroup':
       return {
-        layers: state.layers.map((l) => l.groupId === action.groupId ? { ...l, groupId: null } : l),
+        layers: state.layers.map((l) => l.groupId === action.groupId ? { ...l, groupId: null, color: action.restoredColors?.[l.id] ?? l.color } : l),
         groups: state.groups.filter((g) => g.id !== action.groupId),
       };
     case 'addToGroup': {
@@ -314,7 +344,24 @@ function reduceLocal(state: LayerState, action: ApplyActionPayload): LayerState 
       return { ...state, layers: state.layers.map((l) => l.id === action.layerId ? { ...l, groupId: group.id, color: group.color } : l) };
     }
     case 'removeFromGroup':
-      return { ...state, layers: state.layers.map((l) => l.id === action.layerId ? { ...l, groupId: null } : l) };
+      return { ...state, layers: state.layers.map((l) => l.id === action.layerId ? { ...l, groupId: null, color: action.color ?? l.color } : l) };
+    case 'moveLayer': {
+      const currentIndex = state.layers.findIndex((l) => l.id === action.layerId);
+      if (currentIndex < 0) return state;
+      const targetGroup = action.targetGroupId ? state.groups.find((g) => g.id === action.targetGroupId) : undefined;
+      if (action.targetGroupId && !targetGroup) return state;
+      const remaining = state.layers.filter((l) => l.id !== action.layerId);
+      const moved = {
+        ...state.layers[currentIndex]!,
+        groupId: action.targetGroupId,
+        color: targetGroup?.color ?? action.color ?? state.layers[currentIndex]!.color,
+      };
+      const targetIndex = Math.max(0, Math.min(action.targetIndex, remaining.length));
+      return {
+        ...state,
+        layers: [...remaining.slice(0, targetIndex), moved, ...remaining.slice(targetIndex)],
+      };
+    }
     default:
       return state;
   }
