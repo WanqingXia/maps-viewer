@@ -13,10 +13,11 @@ import type {
   ProjectFileRef,
   CountryCode,
   PrimaryKeyMap,
+  LayerFeatureMetaMap,
 } from '@maps-viewer/shared';
 import type { FeatureCollection, Geometry, Position } from 'geojson';
 import { EMPTY_LAYER_STATE, STROKE_WIDTH_DEFAULT } from '@maps-viewer/shared';
-import { reduce, assignColor, collectPkValues } from '@maps-viewer/core';
+import { reduce, assignColor, collectPkValues, extractPropertyKeys, COUNTRY_BBOXES } from '@maps-viewer/core';
 import type { WorkspaceFolderInfo } from '@maps-viewer/core';
 import { toProjectFileRef } from '@maps-viewer/core';
 import { readGeoJsonFile } from './util/parse-geojson.js';
@@ -275,6 +276,16 @@ export class MapPanel {
     return true;
   }
 
+  locateFeatureById(layerId: string, featureId: number): boolean {
+    const fc = this.layerData.get(layerId);
+    const feature = fc?.features[featureId];
+    if (!feature) return false;
+    const center = featureCentroid(feature.geometry);
+    if (!center) return false;
+    this.queueOrPost({ type: 'locate', layerId, featureId, center });
+    return true;
+  }
+
   /** Build a ProjectSnapshot suitable for save-project — round-trips camera through the webview. */
   async getProjectSnapshot(workspaces: ReadonlyArray<WorkspaceFolderInfo>): Promise<ProjectSnapshot> {
     const camera = await this.requestCameraState();
@@ -341,6 +352,8 @@ export class MapPanel {
       state: this.layerState,
       layerData: payload,
       basemap: this.basemap,
+      countries: COUNTRY_BBOXES,
+      layerFeatureMeta: this.buildLayerFeatureMeta(),
       ...(this.country ? { country: this.country } : {}),
       ...(this.primaryKeyByLayer.size > 0 ? { primaryKeyByLayer: pkMap } : {}),
       ...(this.camera !== DEFAULT_CAMERA ? { camera: this.camera } : {}),
@@ -400,6 +413,17 @@ export class MapPanel {
       case 'requestAction':
         this.handleUserAction(msg.action);
         break;
+      case 'setCountry':
+        this.setCountry(msg.country);
+        break;
+      case 'setPrimaryKey':
+        this.setPrimaryKey(msg.layerId, msg.key);
+        break;
+      case 'locateFeature':
+        if (!this.locateFeatureById(msg.layerId, msg.featureId)) {
+          void vscode.window.showWarningMessage('Maps Viewer: feature not found.');
+        }
+        break;
       case 'cameraState': {
         const handler = this.cameraRequests.get(msg.requestId);
         if (handler) {
@@ -422,6 +446,25 @@ export class MapPanel {
       this.primaryKeyByLayer.delete(action.layerId);
     }
     void this.post({ type: 'applyAction', action });
+  }
+
+  private buildLayerFeatureMeta(): LayerFeatureMetaMap {
+    const out: LayerFeatureMetaMap = {};
+    for (const [layerId, fc] of this.layerData) {
+      const propertyKeys = extractPropertyKeys(fc.features);
+      const featuresByKey: Record<string, Array<{ featureId: number; label: string }>> = {};
+      for (const key of propertyKeys) {
+        const values: Array<{ featureId: number; label: string }> = [];
+        for (let i = 0; i < fc.features.length; i++) {
+          const props = fc.features[i]?.properties;
+          if (!props || props[key] === undefined || props[key] === null) continue;
+          values.push({ featureId: i, label: String(props[key]) });
+        }
+        featuresByKey[key] = values;
+      }
+      out[layerId] = { propertyKeys, featuresByKey };
+    }
+    return out;
   }
 
   private dispose(): void {

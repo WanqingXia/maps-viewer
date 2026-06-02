@@ -51,11 +51,7 @@ export function renderLayer(
       type: 'fill',
       source: layer.id,
       layout: { visibility },
-      filter: [
-        'any',
-        ['==', ['geometry-type'], 'Polygon'],
-        ['==', ['geometry-type'], 'MultiPolygon'],
-      ],
+      filter: sublayerFilter(layer.id, 'fill'),
       paint: { 'fill-color': hoverCase(color), 'fill-opacity': 0.3 },
     });
   }
@@ -65,13 +61,7 @@ export function renderLayer(
       type: 'line',
       source: layer.id,
       layout: { visibility },
-      filter: [
-        'any',
-        ['==', ['geometry-type'], 'LineString'],
-        ['==', ['geometry-type'], 'MultiLineString'],
-        ['==', ['geometry-type'], 'Polygon'],
-        ['==', ['geometry-type'], 'MultiPolygon'],
-      ],
+      filter: sublayerFilter(layer.id, 'line'),
       paint: { 'line-color': hoverCase(color), 'line-width': strokeWidth },
     });
   }
@@ -81,11 +71,7 @@ export function renderLayer(
       type: 'circle',
       source: layer.id,
       layout: { visibility },
-      filter: [
-        'any',
-        ['==', ['geometry-type'], 'Point'],
-        ['==', ['geometry-type'], 'MultiPoint'],
-      ],
+      filter: sublayerFilter(layer.id, 'point'),
       paint: {
         'circle-color': hoverCase(color),
         'circle-radius': Math.max(strokeWidth, 4),
@@ -103,13 +89,7 @@ export function renderLayer(
       source: layer.id,
       maxzoom: DOT_MAXZOOM,
       layout: { visibility },
-      filter: [
-        'all',
-        ['has', LEN_PROP],
-        ['<', ['get', LEN_PROP], SMALL_M],
-        ['!=', ['geometry-type'], 'Point'],
-        ['!=', ['geometry-type'], 'MultiPoint'],
-      ],
+      filter: sublayerFilter(layer.id, 'dot'),
       paint: {
         'circle-color': hoverCase(color),
         'circle-radius': DOT_RADIUS,
@@ -123,6 +103,60 @@ export function renderLayer(
 /** Sublayer ids for a given layer (4 sublayers per layer). */
 export function sublayerIds(layerId: string): ReadonlyArray<string> {
   return [`${layerId}-fill`, `${layerId}-line`, `${layerId}-point`, `${layerId}-dot`];
+}
+
+export type SublayerKind = 'fill' | 'line' | 'point' | 'dot';
+
+export function sublayerFilter(
+  layerId: string,
+  kind: SublayerKind,
+  hiddenFeatureIds: ReadonlySet<number | string> = new Set(),
+): unknown {
+  const base = baseSublayerFilter(kind);
+  if (hiddenFeatureIds.size === 0) return base;
+  return [
+    'all',
+    base,
+    ['!', ['in', ['id'], ['literal', [...hiddenFeatureIds]]]],
+  ];
+}
+
+export function sublayerKindFromId(layerId: string, sublayerId: string): SublayerKind | null {
+  const suffix = sublayerId.slice(layerId.length + 1);
+  return suffix === 'fill' || suffix === 'line' || suffix === 'point' || suffix === 'dot' ? suffix : null;
+}
+
+function baseSublayerFilter(kind: SublayerKind): unknown {
+  switch (kind) {
+    case 'fill':
+      return [
+        'any',
+        ['==', ['geometry-type'], 'Polygon'],
+        ['==', ['geometry-type'], 'MultiPolygon'],
+      ];
+    case 'line':
+      return [
+        'any',
+        ['==', ['geometry-type'], 'LineString'],
+        ['==', ['geometry-type'], 'MultiLineString'],
+        ['==', ['geometry-type'], 'Polygon'],
+        ['==', ['geometry-type'], 'MultiPolygon'],
+      ];
+    case 'point':
+      return [
+        'any',
+        ['==', ['geometry-type'], 'Point'],
+        ['==', ['geometry-type'], 'MultiPoint'],
+      ];
+    case 'dot':
+      return [
+        'all',
+        ['has', LEN_PROP],
+        ['<', ['get', LEN_PROP], SMALL_M],
+        ['!=', ['geometry-type'], 'Point'],
+        ['!=', ['geometry-type'], 'MultiPoint'],
+      ];
+  }
 }
 
 /** Mapbox case expression that swaps to HOVER_COLOR when feature-state.hover is true. */

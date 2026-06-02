@@ -1,6 +1,6 @@
 import type { FeatureCollection } from 'geojson';
 import type { LayerState, LayerAction, UserAction } from './layer.js';
-import type { CountryCode } from './country.js';
+import type { CountryBbox, CountryCode } from './country.js';
 import type { ProjectCameraState } from './project.js';
 
 export type Basemap = 'standard' | 'satellite';
@@ -19,6 +19,20 @@ export type LayerDataMap = Record<string, FeatureCollection>;
  */
 export type PrimaryKeyMap = Record<string, string>;
 
+/** One feature option exposed to the webview for PK-driven feature controls. */
+export interface FeatureOption {
+  readonly featureId: number;
+  readonly label: string;
+}
+
+/** Per-layer property keys and PK values derived from the loaded GeoJSON. */
+export interface LayerFeatureMeta {
+  readonly propertyKeys: ReadonlyArray<string>;
+  readonly featuresByKey: Readonly<Record<string, ReadonlyArray<FeatureOption>>>;
+}
+
+export type LayerFeatureMetaMap = Record<string, LayerFeatureMeta>;
+
 /** Messages posted by the extension host into the webview. */
 export type HostMessage =
   | {
@@ -28,7 +42,9 @@ export type HostMessage =
       readonly layerData: LayerDataMap;
       readonly basemap: Basemap;
       readonly country?: CountryCode;
+      readonly countries?: ReadonlyArray<CountryBbox>;
       readonly primaryKeyByLayer?: PrimaryKeyMap;
+      readonly layerFeatureMeta?: LayerFeatureMetaMap;
       readonly camera?: ProjectCameraState;
     }
   | {
@@ -57,6 +73,9 @@ export type WebviewMessage =
   | { readonly type: 'ready' }
   | { readonly type: 'mapLoaded' }
   | { readonly type: 'requestAction'; readonly action: UserAction }
+  | { readonly type: 'setCountry'; readonly country: CountryCode | null }
+  | { readonly type: 'setPrimaryKey'; readonly layerId: string; readonly key: string | null }
+  | { readonly type: 'locateFeature'; readonly layerId: string; readonly featureId: number }
   | { readonly type: 'cameraState'; readonly requestId: string; readonly camera: ProjectCameraState }
   | { readonly type: 'error'; readonly message: string; readonly code?: string };
 

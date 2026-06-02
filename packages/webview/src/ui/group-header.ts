@@ -75,7 +75,7 @@ export function mountGroupHeader(
     current = next;
     visBtn.setAttribute('aria-pressed', String(next.visible));
     visBtn.setAttribute('aria-label', `Toggle visibility of group ${next.name}`);
-    visBtn.textContent = next.visible ? '●' : '○';
+    visBtn.innerHTML = eyeIcon(next.visible);
     swatch.style.background = next.color;
     swatch.setAttribute('aria-label', `Change color of group ${next.name}`);
     delBtn.setAttribute('aria-label', `Delete group ${next.name}`);
@@ -88,4 +88,11 @@ export function mountGroupHeader(
     update,
     destroy() { picker.destroy(); root.remove(); },
   };
+}
+
+function eyeIcon(visible: boolean): string {
+  if (visible) {
+    return '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>';
+  }
+  return '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m3 3 18 18"/><path d="M10.6 10.6A3 3 0 0 0 13.4 13.4"/><path d="M9.9 5.2A10.8 10.8 0 0 1 12 5c6.5 0 10 7 10 7a18.5 18.5 0 0 1-3.2 4.2"/><path d="M6.6 6.6A18 18 0 0 0 2 12s3.5 7 10 7c1.4 0 2.7-.3 3.8-.8"/></svg>';
 }

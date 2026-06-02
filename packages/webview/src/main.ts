@@ -22,9 +22,13 @@ import type {
   WebviewMessage,
   UserAction,
   LayerState,
+  PrimaryKeyMap,
+  LayerFeatureMetaMap,
+  CountryBbox,
+  CountryCode,
 } from '@maps-viewer/shared';
 import { MapboxMap } from './map/mapbox-map.js';
-import { mountLayersPanel, type LayersPanel } from './ui/layers-panel.js';
+import { mountLayersPanel, type LayersPanel, type LayersPanelUpdate } from './ui/layers-panel.js';
 
 interface VsCodeApi { postMessage(msg: WebviewMessage): void }
 
@@ -44,6 +48,11 @@ const send = (m: WebviewMessage): void => { vscode?.postMessage(m); };
 let map: MapboxMap | null = null;
 let panel: LayersPanel | null = null;
 let currentState: LayerState | null = null;
+let primaryKeyByLayer: PrimaryKeyMap = {};
+let layerFeatureMeta: LayerFeatureMetaMap = {};
+let countries: ReadonlyArray<CountryBbox> = [];
+let currentCountry: CountryCode | null = null;
+const hiddenFeatureIds = new Map<string, Set<number | string>>();
 
 function ensureMapContainer(): HTMLElement {
   let el = document.getElementById('map');
@@ -88,6 +97,8 @@ window.addEventListener('message', (event: MessageEvent<HostMessage>) => {
         return;
       case 'setCountry':
         if (map) handleSetCountry(msg.country);
+        currentCountry = msg.country;
+        updatePanel();
         return;
       case 'setCamera':
         if (map) map.setCamera(msg.camera);
@@ -101,9 +112,12 @@ window.addEventListener('message', (event: MessageEvent<HostMessage>) => {
         }
         return;
       case 'setPrimaryKey':
-        // Phase-4 stub: PK is currently host-only state (used to build the
-        // Locate quick-pick). No UI consumer in the webview yet — kept as
-        // a no-op so future LayersPanel can surface PK badges.
+        if (msg.key) primaryKeyByLayer = { ...primaryKeyByLayer, [msg.layerId]: msg.key };
+        else {
+          const { [msg.layerId]: _removed, ...rest } = primaryKeyByLayer;
+          primaryKeyByLayer = rest;
+        }
+        updatePanel();
         return;
     }
   } catch (err) {
@@ -125,6 +139,7 @@ async function makeSameOriginWorkerUrl(remoteUrl: string): Promise<string> {
 async function handleInit(msg: Extract<HostMessage, { type: 'init' }>): Promise<void> {
   const mapContainer = ensureMapContainer();
   const panelContainer = ensurePanelContainer();
+  wirePanelResize(panelContainer);
 
   if (!window.mapboxgl) {
     send({ type: 'error', message: 'mapbox-gl not loaded', code: 'NO_MAPBOX' });
@@ -140,10 +155,45 @@ async function handleInit(msg: Extract<HostMessage, { type: 'init' }>): Promise<
 
   map = new MapboxMap(mapContainer, msg.basemap, send);
   currentState = msg.state;
+  primaryKeyByLayer = msg.primaryKeyByLayer ?? {};
+  layerFeatureMeta = msg.layerFeatureMeta ?? {};
+  countries = msg.countries ?? [];
+  currentCountry = msg.country ?? null;
 
-  panel = mountLayersPanel(panelContainer, msg.state, (action: UserAction) => {
-    send({ type: 'requestAction', action });
-  });
+  panel = mountLayersPanel(
+    panelContainer,
+    panelUpdate(),
+    (action: UserAction) => {
+      send({ type: 'requestAction', action });
+    },
+    (country) => {
+      currentCountry = country;
+      send({ type: 'setCountry', country });
+      handleSetCountry(country);
+      updatePanel();
+    },
+    (layerId, key) => {
+      if (key) primaryKeyByLayer = { ...primaryKeyByLayer, [layerId]: key };
+      else {
+        const { [layerId]: _removed, ...rest } = primaryKeyByLayer;
+        primaryKeyByLayer = rest;
+      }
+      send({ type: 'setPrimaryKey', layerId, key });
+      updatePanel();
+    },
+    (layerId, featureId) => {
+      send({ type: 'locateFeature', layerId, featureId });
+    },
+    (layerId, featureId, visible) => {
+      const hidden = hiddenFeatureIds.get(layerId) ?? new Set<number | string>();
+      if (visible) hidden.delete(featureId);
+      else hidden.add(featureId);
+      if (hidden.size === 0) hiddenFeatureIds.delete(layerId);
+      else hiddenFeatureIds.set(layerId, hidden);
+      map?.setFeatureVisible(layerId, featureId, visible);
+      updatePanel();
+    },
+  );
 
   map.whenReady(() => {
     if (!map) return;
@@ -160,58 +210,52 @@ async function handleInit(msg: Extract<HostMessage, { type: 'init' }>): Promise<
   });
 }
 
+function wirePanelResize(panelContainer: HTMLElement): void {
+  const update = (): void => {
+    document.documentElement.style.setProperty('--mv-panel-width', `${panelContainer.getBoundingClientRect().width}px`);
+  };
+  update();
+  if ('ResizeObserver' in window) {
+    const observer = new ResizeObserver(update);
+    observer.observe(panelContainer);
+  }
+}
+
 function handleApplyAction(msg: Extract<HostMessage, { type: 'applyAction' }>): void {
   if (!map) return;
   map.applyAction(msg.action, msg.layerData);
   if (currentState) {
     currentState = reduceLocal(currentState, msg.action);
-    panel?.update(currentState);
+    updatePanel();
   }
 }
 
-/**
- * Tiny inline country bbox table for the webview-side fit. Mirrors a
- * subset of the core table — keeps the webview bundle free of the core
- * runtime. Unknown codes are no-ops (host should validate before sending).
- */
-const COUNTRY_TABLE: Record<string, [number, number, number, number]> = {
-  AR: [-73.58, -55.06, -53.64, -21.78], AT: [9.53, 46.37, 17.16, 49.02],
-  AU: [112.92, -43.74, 153.64, -10.06], BE: [2.51, 49.50, 6.41, 51.51],
-  BR: [-73.99, -33.75, -34.79, 5.27], CA: [-141.00, 41.68, -52.62, 83.11],
-  CH: [5.95, 45.82, 10.49, 47.81], CL: [-75.64, -55.98, -66.42, -17.51],
-  CN: [73.55, 18.16, 134.77, 53.56], CO: [-78.99, -4.23, -66.85, 13.39],
-  CZ: [12.09, 48.55, 18.86, 51.06], DE: [5.86, 47.27, 15.04, 55.06],
-  DK: [8.07, 54.55, 15.16, 57.75], EG: [24.70, 22.00, 36.87, 31.67],
-  ES: [-9.30, 36.00, 4.32, 43.79], FI: [20.62, 59.81, 31.59, 70.09],
-  FR: [-5.14, 41.33, 9.56, 51.09], GB: [-8.65, 49.86, 1.77, 60.86],
-  GR: [19.37, 34.80, 29.65, 41.75], ID: [95.01, -11.01, 141.02, 6.08],
-  IE: [-10.48, 51.39, -5.99, 55.38], IL: [34.27, 29.50, 35.90, 33.34],
-  IN: [68.18, 6.75, 97.40, 35.50], IS: [-24.55, 63.30, -13.50, 66.57],
-  IT: [6.63, 35.49, 18.52, 47.10], JP: [122.93, 24.04, 145.81, 45.55],
-  KE: [33.91, -4.68, 41.91, 5.51], KR: [125.06, 33.19, 129.58, 38.61],
-  MA: [-13.17, 27.66, -1.01, 35.93], MX: [-118.40, 14.53, -86.71, 32.72],
-  MY: [99.64, 0.86, 119.27, 7.36], NG: [2.69, 4.27, 14.68, 13.89],
-  NL: [3.36, 50.75, 7.23, 53.55], NO: [4.65, 57.98, 31.29, 71.18],
-  NZ: [165.86, -47.29, 178.91, -34.39], PE: [-81.41, -18.35, -68.65, -0.04],
-  PH: [116.93, 4.59, 126.61, 21.12], PL: [14.07, 49.00, 24.15, 54.84],
-  PT: [-9.50, 36.96, -6.19, 42.15], RU: [19.66, 41.19, 180.00, 81.86],
-  SA: [34.49, 16.38, 55.67, 32.16], SE: [11.10, 55.34, 24.16, 69.06],
-  SG: [103.60, 1.20, 104.06, 1.48], TH: [97.34, 5.61, 105.64, 20.47],
-  TR: [26.04, 35.82, 44.79, 42.14], UA: [22.13, 44.39, 40.22, 52.38],
-  US: [-125.00, 24.40, -66.93, 49.38], VN: [102.14, 8.59, 109.47, 23.39],
-  ZA: [16.45, -34.83, 32.89, -22.13],
-};
 const WORLD_BBOX: [number, number, number, number] = [-180, -85, 180, 85];
 
 function handleSetCountry(code: string | null): void {
   if (!map) return;
   if (!code) { map.setCountry(null, WORLD_BBOX); return; }
-  const bbox = COUNTRY_TABLE[code.toUpperCase()];
-  if (!bbox) {
+  const match = countries.find((item) => item.code === code.toUpperCase());
+  if (!match) {
     send({ type: 'error', message: `Unknown country code: ${code}`, code: 'NO_COUNTRY_BBOX' });
     return;
   }
-  map.setCountry(code, bbox);
+  map.setCountry(code, match.bbox);
+}
+
+function panelUpdate(): LayersPanelUpdate {
+  return {
+    state: currentState ?? { layers: [], groups: [] },
+    primaryKeyByLayer,
+    layerFeatureMeta,
+    hiddenFeatureIds,
+    countries,
+    country: currentCountry,
+  };
+}
+
+function updatePanel(): void {
+  panel?.update(panelUpdate());
 }
 
 type ApplyActionPayload = Extract<HostMessage, { type: 'applyAction' }>['action'];

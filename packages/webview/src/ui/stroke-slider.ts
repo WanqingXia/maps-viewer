@@ -31,10 +31,14 @@ export function mountStrokeSlider(
   input.setAttribute('aria-valuenow', String(initial));
   input.setAttribute('aria-valuetext', `${initial} pixels`);
 
-  const readout = document.createElement('span');
-  readout.className = 'mv-stroke-slider__value';
-  readout.textContent = String(initial);
-  readout.setAttribute('aria-hidden', 'true');
+  const number = document.createElement('input');
+  number.type = 'number';
+  number.min = String(STROKE_WIDTH_MIN);
+  number.max = String(STROKE_WIDTH_MAX);
+  number.step = '1';
+  number.value = String(initial);
+  number.className = 'mv-stroke-slider__number';
+  number.setAttribute('aria-label', 'Stroke width value');
 
   let frame = 0;
   let pendingValue = initial;
@@ -44,29 +48,44 @@ export function mountStrokeSlider(
     onChange(pendingValue);
   };
 
-  input.addEventListener('input', () => {
-    pendingValue = Number(input.value);
-    readout.textContent = String(pendingValue);
+  const commit = (raw: number): void => {
+    pendingValue = clamp(raw);
+    input.value = String(pendingValue);
+    number.value = String(pendingValue);
     input.setAttribute('aria-valuenow', String(pendingValue));
     input.setAttribute('aria-valuetext', `${pendingValue} pixels`);
     if (frame === 0) frame = window.requestAnimationFrame(flush);
+  };
+
+  input.addEventListener('input', () => {
+    commit(Number(input.value));
+  });
+
+  number.addEventListener('input', () => {
+    commit(Number(number.value));
   });
 
   wrap.appendChild(input);
-  wrap.appendChild(readout);
+  wrap.appendChild(number);
 
   return {
     element: wrap,
     setValue(v: number) {
       if (Number(input.value) === v) return;
-      input.value = String(v);
-      readout.textContent = String(v);
-      input.setAttribute('aria-valuenow', String(v));
-      input.setAttribute('aria-valuetext', `${v} pixels`);
+      const next = clamp(v);
+      input.value = String(next);
+      number.value = String(next);
+      input.setAttribute('aria-valuenow', String(next));
+      input.setAttribute('aria-valuetext', `${next} pixels`);
     },
     destroy() {
       if (frame) window.cancelAnimationFrame(frame);
       wrap.remove();
     },
   };
+}
+
+function clamp(value: number): number {
+  if (Number.isNaN(value)) return STROKE_WIDTH_MIN;
+  return Math.max(STROKE_WIDTH_MIN, Math.min(STROKE_WIDTH_MAX, Math.round(value)));
 }

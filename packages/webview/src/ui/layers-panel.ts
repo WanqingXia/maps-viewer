@@ -1,11 +1,20 @@
-import type { LayerState, Layer, Group, UserAction } from '@maps-viewer/shared';
-import { mountLayerRow, type LayerRow } from './layer-row.js';
+import { AUTO_PALETTE, type CountryBbox, type CountryCode, type LayerFeatureMetaMap, type LayerState, type Layer, type Group, type PrimaryKeyMap, type UserAction } from '@maps-viewer/shared';
+import { mountLayerRow, type LayerRow, type LayerRowOptions } from './layer-row.js';
 import { mountGroupHeader, type GroupHeader } from './group-header.js';
 
 export interface LayersPanel {
   element: HTMLElement;
-  update(state: LayerState): void;
+  update(options: LayersPanelUpdate): void;
   destroy(): void;
+}
+
+export interface LayersPanelUpdate {
+  readonly state: LayerState;
+  readonly primaryKeyByLayer: PrimaryKeyMap;
+  readonly layerFeatureMeta: LayerFeatureMetaMap;
+  readonly hiddenFeatureIds: ReadonlyMap<string, ReadonlySet<number | string>>;
+  readonly countries: ReadonlyArray<CountryBbox>;
+  readonly country: CountryCode | null;
 }
 
 /**
@@ -14,8 +23,12 @@ export interface LayersPanel {
  */
 export function mountLayersPanel(
   container: HTMLElement,
-  initial: LayerState,
+  initial: LayersPanelUpdate,
   onAction: (a: UserAction) => void,
+  onCountry: (country: CountryCode | null) => void,
+  onPrimaryKey: (layerId: string, key: string | null) => void,
+  onLocateFeature: (layerId: string, featureId: number) => void,
+  onFeatureVisible: (layerId: string, featureId: number, visible: boolean) => void,
 ): LayersPanel {
   const root = document.createElement('aside');
   root.className = 'mv-layers-panel';
@@ -28,9 +41,20 @@ export function mountLayersPanel(
   title.className = 'mv-layers-panel__title';
   const count = document.createElement('span');
   count.className = 'mv-layers-panel__count';
+  const groupBtn = document.createElement('button');
+  groupBtn.type = 'button';
+  groupBtn.className = 'mv-layers-panel__group';
+  groupBtn.textContent = 'Group';
+  groupBtn.disabled = true;
+  groupBtn.title = 'Group selected layers';
+  const country = document.createElement('select');
+  country.className = 'mv-layers-panel__country';
+  country.setAttribute('aria-label', 'Country scope');
   header.appendChild(title);
   header.appendChild(count);
+  header.appendChild(groupBtn);
   root.appendChild(header);
+  root.appendChild(country);
 
   const body = document.createElement('div');
   body.className = 'mv-layers-panel__body';
@@ -40,9 +64,34 @@ export function mountLayersPanel(
 
   const layerRows = new Map<string, LayerRow>();
   const groupHeaders = new Map<string, GroupHeader>();
+  const selectedLayerIds = new Set<string>();
 
-  function update(state: LayerState): void {
+  groupBtn.addEventListener('click', () => {
+    const layerIds = [...selectedLayerIds];
+    if (layerIds.length < 2) return;
+    const state = lastUpdate.state;
+    const group = {
+      id: `group-${Date.now()}`,
+      name: `Group ${state.groups.length + 1}`,
+      color: AUTO_PALETTE[state.groups.length % AUTO_PALETTE.length]!,
+      visible: true,
+    };
+    onAction({ type: 'createGroup', group, layerIds });
+    selectedLayerIds.clear();
+  });
+
+  country.addEventListener('change', () => {
+    onCountry(country.value === '' ? null : country.value);
+  });
+
+  let lastUpdate = initial;
+
+  function update(options: LayersPanelUpdate): void {
+    lastUpdate = options;
+    const { state } = options;
     count.textContent = `(${state.layers.length})`;
+    groupBtn.disabled = selectedLayerIds.size < 2;
+    renderCountries(options);
 
     // Build the new DOM order: groups in order of first appearance, then
     // ungrouped layers (in array order).
@@ -101,10 +150,22 @@ export function mountLayersPanel(
     function renderLayerRow(layer: Layer): void {
       let row = layerRows.get(layer.id);
       if (!row) {
-        row = mountLayerRow(layer, onAction);
+        row = mountLayerRow(
+          toRowOptions(layer, options),
+          onAction,
+          (layerId, selected) => {
+            if (selected) selectedLayerIds.add(layerId);
+            else selectedLayerIds.delete(layerId);
+            groupBtn.disabled = selectedLayerIds.size < 2;
+            update(lastUpdate);
+          },
+          onPrimaryKey,
+          onLocateFeature,
+          onFeatureVisible,
+        );
         layerRows.set(layer.id, row);
       } else {
-        row.update(layer);
+        row.update(toRowOptions(layer, options));
       }
       body.appendChild(row.element);
     }
@@ -123,4 +184,40 @@ export function mountLayersPanel(
       root.remove();
     },
   };
+
+  function toRowOptions(layer: Layer, options: LayersPanelUpdate): LayerRowOptions {
+    return {
+      layer,
+      selected: selectedLayerIds.has(layer.id),
+      primaryKey: options.primaryKeyByLayer[layer.id] ?? null,
+      meta: options.layerFeatureMeta[layer.id],
+      hiddenFeatureIds: options.hiddenFeatureIds.get(layer.id) ?? new Set(),
+    };
+  }
+
+  function renderCountries(options: LayersPanelUpdate): void {
+    const value = options.country ?? '';
+    country.innerHTML = [
+      '<option value="">World</option>',
+      ...options.countries
+        .map((item) => `<option value="${escapeAttr(item.code)}">${escapeHtml(item.name)}</option>`),
+    ].join('');
+    country.value = value;
+  }
+}
+
+function escapeHtml(s: string): string {
+  return s.replace(/[&<>"']/g, (c) => {
+    switch (c) {
+      case '&': return '&amp;';
+      case '<': return '&lt;';
+      case '>': return '&gt;';
+      case '"': return '&quot;';
+      default: return '&#39;';
+    }
+  });
+}
+
+function escapeAttr(s: string): string {
+  return escapeHtml(s);
 }

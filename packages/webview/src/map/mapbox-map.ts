@@ -8,17 +8,18 @@ import type {
   CountryCode,
 } from '@maps-viewer/shared';
 import type { FeatureCollection } from 'geojson';
-import { renderLayer, sublayerIds, hoverCase, iterateCoordinates } from './render-layer.js';
+import { renderLayer, sublayerIds, hoverCase, iterateCoordinates, sublayerFilter, sublayerKindFromId } from './render-layer.js';
 import { wireHover } from './hover.js';
 import { mountBasemapToggle, type BasemapToggle } from '../ui/basemap-toggle.js';
 import { mountPropertiesPopup, type PropertiesPopup } from '../ui/properties-popup.js';
+import { mountFeatureDetails, type FeatureDetails } from '../ui/feature-details.js';
 
 const STYLES: Record<Basemap, string> = {
   standard: 'mapbox://styles/mapbox/streets-v12',
   satellite: 'mapbox://styles/mapbox/satellite-streets-v12',
 };
 
-const LOCATE_ZOOM_DEFAULT = 14;
+const POINT_LOCATE_ZOOM_DEFAULT = 16;
 const LOCATE_PULSE_MS = 1500;
 
 export class MapboxMap {
@@ -28,7 +29,10 @@ export class MapboxMap {
   private readonly hoverDisposers = new Map<string, () => void>();
   private currentBasemap: Basemap;
   private readonly popup: PropertiesPopup;
+  private readonly details: FeatureDetails;
   private readonly toggle: BasemapToggle;
+  private readonly hiddenFeatureIds = new Map<string, Set<number | string>>();
+  private selectedFeature: { layerId: string; featureId: number | string } | null = null;
 
   constructor(
     container: HTMLElement,
@@ -46,11 +50,17 @@ export class MapboxMap {
     });
     this.map.addControl(new window.mapboxgl.NavigationControl({ visualizePitch: false }), 'bottom-right');
     this.popup = mountPropertiesPopup(container);
+    this.details = mountFeatureDetails(
+      container,
+      () => this.zoomToSelectedFeature(),
+      () => this.toggleSelectedFeatureVisible(),
+    );
     this.toggle = mountBasemapToggle(container, basemap, (next) => this.setBasemap(next));
     this.map.on('error', (e: unknown) => {
       const detail = (e as { error?: { message?: string } }).error?.message ?? 'unknown';
       this.send({ type: 'error', message: `mapbox: ${detail}`, code: 'MAPBOX_ERROR' });
     });
+    this.map.on('click', (event: unknown) => this.handleMapClick(event));
   }
 
   whenReady(fn: () => void): void {
@@ -121,13 +131,48 @@ export class MapboxMap {
         this.layers.set(action.layerId, { ...layer, displayName });
         return;
       }
+      case 'createGroup': {
+        for (const layerId of action.layerIds) {
+          const layer = this.layers.get(layerId);
+          if (!layer) continue;
+          const next = { ...layer, groupId: action.group.id, color: action.group.color };
+          this.layers.set(layerId, next);
+          this.repaintColor(layerId, action.group.color);
+        }
+        return;
+      }
       case 'setGroupColor':
+        for (const [layerId, layer] of this.layers) {
+          if (layer.groupId !== action.groupId) continue;
+          this.layers.set(layerId, { ...layer, color: action.color });
+          this.repaintColor(layerId, action.color);
+        }
+        return;
       case 'setGroupVisible':
-      case 'createGroup':
+        for (const [layerId, layer] of this.layers) {
+          if (layer.groupId !== action.groupId) continue;
+          this.layers.set(layerId, { ...layer, visible: action.visible });
+          this.repaintVisible(layerId, action.visible);
+        }
+        return;
       case 'renameGroup':
+        return;
       case 'deleteGroup':
+        for (const [layerId, layer] of this.layers) {
+          if (layer.groupId === action.groupId) this.layers.set(layerId, { ...layer, groupId: null });
+        }
+        return;
       case 'addToGroup':
+        for (const [layerId, layer] of this.layers) {
+          if (layerId !== action.layerId) continue;
+          this.layers.set(layerId, { ...layer, groupId: action.groupId });
+        }
+        return;
       case 'removeFromGroup':
+        for (const [layerId, layer] of this.layers) {
+          if (layerId !== action.layerId) continue;
+          this.layers.set(layerId, { ...layer, groupId: null });
+        }
         return;
     }
   }
@@ -176,11 +221,20 @@ export class MapboxMap {
    * webview never has to scan features for the PK value.
    */
   locate(layerId: string, featureId: number, center: readonly [number, number], zoom?: number): void {
-    this.map.flyTo({
-      center: [center[0], center[1]],
-      zoom: zoom ?? LOCATE_ZOOM_DEFAULT,
-      duration: 800,
-    });
+    const feature = this.layerData.get(layerId)?.features[featureId];
+    const bounds = feature ? boundsOfGeometry(feature.geometry) : null;
+    if (bounds && !isPointBounds(bounds)) {
+      this.map.fitBounds(
+        [[bounds[0], bounds[1]], [bounds[2], bounds[3]]],
+        { padding: 72, animate: true, duration: 800 },
+      );
+    } else {
+      this.map.flyTo({
+        center: [center[0], center[1]],
+        zoom: zoom ?? POINT_LOCATE_ZOOM_DEFAULT,
+        duration: 800,
+      });
+    }
     try {
       this.map.setFeatureState({ source: layerId, id: featureId }, { hover: true });
     } catch {
@@ -219,7 +273,20 @@ export class MapboxMap {
     this.hoverDisposers.clear();
     this.toggle.destroy();
     this.popup.destroy();
+    this.details.destroy();
     this.map.remove();
+  }
+
+  setFeatureVisible(layerId: string, featureId: number | string, visible: boolean): void {
+    const hidden = this.hiddenFeatureIds.get(layerId) ?? new Set<number | string>();
+    if (visible) hidden.delete(featureId);
+    else hidden.add(featureId);
+    if (hidden.size === 0) this.hiddenFeatureIds.delete(layerId);
+    else this.hiddenFeatureIds.set(layerId, hidden);
+    this.repaintFeatureFilters(layerId);
+    if (this.selectedFeature?.layerId === layerId && this.selectedFeature.featureId === featureId) {
+      this.details.setHidden(!visible);
+    }
   }
 
   private repaintColor(layerId: string, color: Layer['color']): void {
@@ -248,6 +315,56 @@ export class MapboxMap {
     }
   }
 
+  private repaintFeatureFilters(layerId: string): void {
+    const hidden = this.hiddenFeatureIds.get(layerId) ?? new Set<number | string>();
+    for (const sublayerId of sublayerIds(layerId)) {
+      const kind = sublayerKindFromId(layerId, sublayerId);
+      if (kind && this.map.getLayer(sublayerId)) {
+        this.map.setFilter(sublayerId, sublayerFilter(layerId, kind, hidden));
+      }
+    }
+  }
+
+  private handleMapClick(event: unknown): void {
+    const point = (event as { point?: { x: number; y: number } }).point;
+    if (!point) return;
+    const layers = [...this.layers.keys()].flatMap((layerId) => [...sublayerIds(layerId)]);
+    const features = this.map.queryRenderedFeatures([point.x, point.y], { layers });
+    const feature = features.find((f) => f.id !== undefined);
+    if (!feature || feature.id === undefined) {
+      this.selectedFeature = null;
+      this.details.hide();
+      return;
+    }
+    const layerId = feature.source;
+    const layer = this.layers.get(layerId);
+    if (!layer) return;
+    this.selectedFeature = { layerId, featureId: feature.id };
+    const hidden = this.hiddenFeatureIds.get(layerId)?.has(feature.id) ?? false;
+    this.details.show({
+      layerName: layer.displayName,
+      featureId: feature.id,
+      properties: feature.properties,
+      hidden,
+    });
+  }
+
+  private zoomToSelectedFeature(): void {
+    if (!this.selectedFeature) return;
+    const id = Number(this.selectedFeature.featureId);
+    if (!Number.isInteger(id)) return;
+    const feature = this.layerData.get(this.selectedFeature.layerId)?.features[id];
+    const center = feature ? centerOfGeometry(feature.geometry) : null;
+    if (!center) return;
+    this.locate(this.selectedFeature.layerId, id, center);
+  }
+
+  private toggleSelectedFeatureVisible(): void {
+    if (!this.selectedFeature) return;
+    const hidden = this.hiddenFeatureIds.get(this.selectedFeature.layerId)?.has(this.selectedFeature.featureId) ?? false;
+    this.setFeatureVisible(this.selectedFeature.layerId, this.selectedFeature.featureId, hidden);
+  }
+
   private fitToLayers(): void {
     let minLng = Infinity, minLat = Infinity, maxLng = -Infinity, maxLat = -Infinity;
     let any = false;
@@ -266,6 +383,53 @@ export class MapboxMap {
       minLng -= pad; maxLng += pad; minLat -= pad; maxLat += pad;
     }
     this.map.fitBounds([[minLng, minLat], [maxLng, maxLat]], { padding: 40, animate: false, duration: 0 });
+  }
+}
+
+function boundsOfGeometry(g: GeoJSON.Geometry | null): [number, number, number, number] | null {
+  if (!g) return null;
+  let minLng = Infinity, minLat = Infinity, maxLng = -Infinity, maxLat = -Infinity;
+  for (const [lng, lat] of coordsOfGeometry(g)) {
+    if (lng < minLng) minLng = lng;
+    if (lat < minLat) minLat = lat;
+    if (lng > maxLng) maxLng = lng;
+    if (lat > maxLat) maxLat = lat;
+  }
+  return isFinite(minLng) ? [minLng, minLat, maxLng, maxLat] : null;
+}
+
+function centerOfGeometry(g: GeoJSON.Geometry | null): [number, number] | null {
+  const bounds = boundsOfGeometry(g);
+  return bounds ? [(bounds[0] + bounds[2]) / 2, (bounds[1] + bounds[3]) / 2] : null;
+}
+
+function isPointBounds(bounds: [number, number, number, number]): boolean {
+  return bounds[0] === bounds[2] && bounds[1] === bounds[3];
+}
+
+function* coordsOfGeometry(g: GeoJSON.Geometry): Generator<[number, number]> {
+  switch (g.type) {
+    case 'Point':
+      yield g.coordinates as [number, number];
+      return;
+    case 'MultiPoint':
+    case 'LineString':
+      for (const c of g.coordinates as Array<[number, number]>) yield c;
+      return;
+    case 'MultiLineString':
+    case 'Polygon':
+      for (const ring of g.coordinates as Array<Array<[number, number]>>) {
+        for (const c of ring) yield c;
+      }
+      return;
+    case 'MultiPolygon':
+      for (const poly of g.coordinates as Array<Array<Array<[number, number]>>>) {
+        for (const ring of poly) for (const c of ring) yield c;
+      }
+      return;
+    case 'GeometryCollection':
+      for (const inner of g.geometries) yield* coordsOfGeometry(inner);
+      return;
   }
 }
 

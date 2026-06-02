@@ -37,6 +37,7 @@ declare global {
     setStyle(style: string): void;
     setPaintProperty(layerId: string, name: string, value: unknown): void;
     setLayoutProperty(layerId: string, name: string, value: unknown): void;
+    setFilter(layerId: string, filter: unknown): void;
     setFeatureState(target: { source: string; id: string | number }, state: Record<string, unknown>): void;
     removeFeatureState(target: { source: string; id?: string | number }, key?: string): void;
     queryRenderedFeatures(point: [number, number] | Array<[number, number]>, options?: { layers?: string[] }): Array<MapboxQueriedFeature>;
