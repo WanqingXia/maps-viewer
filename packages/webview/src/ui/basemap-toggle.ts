@@ -37,6 +37,7 @@ export function mountBasemapToggle(
     btn.textContent = label;
     btn.dataset.basemap = value;
     btn.setAttribute('aria-pressed', String(value === current));
+    btn.setAttribute('aria-label', `${label} basemap`);
     btn.addEventListener('click', () => {
       if (current === value) return;
       current = value;

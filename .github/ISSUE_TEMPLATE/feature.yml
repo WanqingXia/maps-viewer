@@ -1,0 +1,22 @@
+name: Feature request
+description: Suggest something Maps Viewer should do.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What's the problem?
+      description: Describe the user-visible pain. "I currently have to do X every time…"
+    validations: { required: true }
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: What would solve it?
+      description: A rough sketch of the feature.
+    validations: { required: true }
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives you considered

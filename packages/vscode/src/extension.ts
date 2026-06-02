@@ -14,6 +14,7 @@ import { openProject } from './manager/commands/open-project.js';
 import { renameProject } from './manager/commands/rename-project.js';
 import { deleteProject } from './manager/commands/delete-project.js';
 import { newProject } from './manager/commands/new-project.js';
+import { maybeShowWelcome } from './welcome.js';
 
 let logger: Logger | undefined;
 
@@ -85,6 +86,12 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
     { dispose: () => logger?.dispose() },
   );
+
+  // One-shot welcome notification on first activation per major version.
+  // Fire-and-forget — never blocks activation.
+  void maybeShowWelcome(context).catch((err) => {
+    logger?.error('welcome notification failed', err);
+  });
 }
 
 export function deactivate(): void {

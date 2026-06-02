@@ -207,7 +207,7 @@ maps-viewer/  (pnpm workspace root)
 | 2 | Multi-file layers + styling | Multiple files in one map, 20-color palette, view/hide/rename/delete, stroke width, color picker | complete | - | 1 | [completed/phase-2-multi-file-layers-styling.plan.md](../plans/completed/phase-2-multi-file-layers-styling.plan.md) · [report](../reports/phase-2-multi-file-layers-styling-report.md) |
 | 3 | Maps Manager + persistence | Activity-bar tree view, save/open named projects, layer state restored | complete | with 4 | 2 | [completed/phase-3-maps-manager-persistence.plan.md](../plans/completed/phase-3-maps-manager-persistence.plan.md) · [report](../reports/phase-3-and-4-report.md) |
 | 4 | Discovery features | Primary key, Locate, country bbox, small-feature-as-dot | complete | with 3 | 2 | [completed/phase-4-discovery-features.plan.md](../plans/completed/phase-4-discovery-features.plan.md) · [report](../reports/phase-3-and-4-report.md) |
-| 5 | Polish + publish | Icon, README, marketplace assets, telemetry decision, perf sweep, publish | pending | - | 3, 4 | [phase-5-polish-publish.plan.md](../plans/phase-5-polish-publish.plan.md) |
+| 5 | Polish + publish | Icon, README, marketplace assets, telemetry decision, perf sweep, publish | complete | - | 3, 4 | [completed/phase-5-polish-publish.plan.md](../plans/completed/phase-5-polish-publish.plan.md) · [report](../reports/phase-5-polish-publish-report.md) |
 
 ### Phase Details
 

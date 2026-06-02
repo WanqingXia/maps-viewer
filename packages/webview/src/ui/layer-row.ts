@@ -17,6 +17,7 @@ export function mountLayerRow(
 
   const row = document.createElement('div');
   row.className = 'mv-layer-row';
+  row.setAttribute('role', 'listitem');
   row.dataset.layerId = layer.id;
 
   // 1. Visibility toggle
@@ -24,12 +25,15 @@ export function mountLayerRow(
   visBtn.type = 'button';
   visBtn.className = 'mv-layer-row__vis';
   visBtn.title = 'Toggle visibility';
+  visBtn.setAttribute('aria-label', `Toggle visibility of layer ${layer.displayName}`);
 
   // 2. Color swatch (opens picker)
   const swatch = document.createElement('button');
   swatch.type = 'button';
   swatch.className = 'mv-layer-row__color';
   swatch.title = 'Change color';
+  swatch.setAttribute('aria-label', `Change color of layer ${layer.displayName}`);
+  swatch.setAttribute('aria-haspopup', 'listbox');
 
   // 3. Name (click to rename)
   const name = document.createElement('input');
@@ -37,6 +41,7 @@ export function mountLayerRow(
   name.className = 'mv-layer-row__name';
   name.spellcheck = false;
   name.title = 'Rename layer';
+  name.setAttribute('aria-label', 'Layer name');
 
   // 4. Stroke slider chip (collapsible)
   const stroke = mountStrokeSlider(layer.strokeWidth, (width) =>
@@ -50,6 +55,7 @@ export function mountLayerRow(
   delBtn.className = 'mv-layer-row__delete';
   delBtn.title = 'Remove layer';
   delBtn.textContent = '✕';
+  delBtn.setAttribute('aria-label', `Remove layer ${layer.displayName}`);
 
   row.appendChild(visBtn);
   row.appendChild(swatch);
@@ -90,8 +96,11 @@ export function mountLayerRow(
     current = next;
     row.dataset.visible = String(next.visible);
     visBtn.setAttribute('aria-pressed', String(next.visible));
+    visBtn.setAttribute('aria-label', `Toggle visibility of layer ${next.displayName}`);
     visBtn.textContent = next.visible ? '●' : '○';
     swatch.style.background = next.color;
+    swatch.setAttribute('aria-label', `Change color of layer ${next.displayName}`);
+    delBtn.setAttribute('aria-label', `Remove layer ${next.displayName}`);
     if (document.activeElement !== name) name.value = next.displayName;
     stroke.setValue(next.strokeWidth);
   }

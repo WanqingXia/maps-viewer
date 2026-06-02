@@ -1,0 +1,66 @@
+name: Bug report
+description: Something broke or behaved unexpectedly.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to file a bug. The more specific you are, the faster we can fix it.
+
+  - type: input
+    id: vscode-version
+    attributes:
+      label: VS Code version
+      description: From "Code → About Visual Studio Code"
+      placeholder: e.g. 1.92.1
+    validations: { required: true }
+
+  - type: input
+    id: extension-version
+    attributes:
+      label: Maps Viewer version
+      description: From the Extensions panel
+      placeholder: e.g. 0.1.0
+    validations: { required: true }
+
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      options:
+        - macOS (Intel)
+        - macOS (Apple Silicon)
+        - Windows
+        - Linux
+        - Other
+    validations: { required: true }
+
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      description: Be specific — file size, geometry types, settings used.
+      placeholder: |
+        1. Open a folder with a `.geojson` file (~10 MB)
+        2. Right-click → View in Maps
+        3. Click "Satellite" — basemap doesn't switch
+    validations: { required: true }
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations: { required: true }
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      description: Include any error from "View → Output → Maps Viewer" and the webview dev tools console.
+    validations: { required: true }
+
+  - type: textarea
+    id: sample
+    attributes:
+      label: Sample GeoJSON (optional)
+      description: If the bug is data-specific, paste a minimal feature here. Don't paste private data.

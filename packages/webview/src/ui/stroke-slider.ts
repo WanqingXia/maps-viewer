@@ -26,10 +26,15 @@ export function mountStrokeSlider(
   input.value = String(initial);
   input.className = 'mv-stroke-slider__input';
   input.setAttribute('aria-label', 'Stroke width');
+  input.setAttribute('aria-valuemin', String(STROKE_WIDTH_MIN));
+  input.setAttribute('aria-valuemax', String(STROKE_WIDTH_MAX));
+  input.setAttribute('aria-valuenow', String(initial));
+  input.setAttribute('aria-valuetext', `${initial} pixels`);
 
   const readout = document.createElement('span');
   readout.className = 'mv-stroke-slider__value';
   readout.textContent = String(initial);
+  readout.setAttribute('aria-hidden', 'true');
 
   let frame = 0;
   let pendingValue = initial;
@@ -42,6 +47,8 @@ export function mountStrokeSlider(
   input.addEventListener('input', () => {
     pendingValue = Number(input.value);
     readout.textContent = String(pendingValue);
+    input.setAttribute('aria-valuenow', String(pendingValue));
+    input.setAttribute('aria-valuetext', `${pendingValue} pixels`);
     if (frame === 0) frame = window.requestAnimationFrame(flush);
   });
 
@@ -54,6 +61,8 @@ export function mountStrokeSlider(
       if (Number(input.value) === v) return;
       input.value = String(v);
       readout.textContent = String(v);
+      input.setAttribute('aria-valuenow', String(v));
+      input.setAttribute('aria-valuetext', `${v} pixels`);
     },
     destroy() {
       if (frame) window.cancelAnimationFrame(frame);

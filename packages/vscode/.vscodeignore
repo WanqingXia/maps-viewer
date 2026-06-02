@@ -3,6 +3,7 @@
 .github/**
 src/**
 test/**
+scripts/**
 **/*.map
 **/*.ts
 **/tsconfig.json
@@ -10,3 +11,6 @@ test/**
 **/.eslintrc*
 **/.prettierrc*
 node_modules/**/test/**
+
+# Build-only assets — only the rendered PNG is shipped, not the SVG source
+resources/icon.svg

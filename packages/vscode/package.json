@@ -1,11 +1,23 @@
 {
   "name": "maps-viewer",
   "displayName": "Maps Viewer",
-  "description": "View GeoJSON files on a Mapbox map directly in VS Code.",
-  "version": "0.0.1",
+  "description": "View multiple GeoJSON files together on a Mapbox map — with grouping, color palette, hover popups, country scoping, primary-key Locate, and saved projects. Directly in VS Code.",
+  "version": "0.1.0",
   "publisher": "PLACEHOLDER",
   "private": true,
   "license": "MIT",
+  "icon": "resources/icon.png",
+  "categories": ["Visualization", "Other"],
+  "keywords": ["geojson", "map", "mapbox", "gis", "geo", "viewer", "spatial"],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/PLACEHOLDER/maps-viewer.git"
+  },
+  "bugs": {
+    "url": "https://github.com/PLACEHOLDER/maps-viewer/issues"
+  },
+  "homepage": "https://github.com/PLACEHOLDER/maps-viewer#readme",
+  "qna": "marketplace",
   "engines": {
     "vscode": "^1.85.0"
   },

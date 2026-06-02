@@ -1,0 +1,56 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    name: typecheck + test + build (node ${{ matrix.node }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [20, 22]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 11
+
+      - name: Setup Node ${{ matrix.node }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Test
+        run: pnpm test
+
+      - name: Build (cold)
+        run: |
+          pnpm --filter @maps-viewer/shared build
+          pnpm --filter @maps-viewer/core build
+          pnpm build
+
+      - name: Package VSIX (node 22 only)
+        if: matrix.node == 22
+        working-directory: packages/vscode
+        run: pnpm package
+
+      - name: Upload VSIX artifact
+        if: matrix.node == 22
+        uses: actions/upload-artifact@v4
+        with:
+          name: vsix
+          path: packages/vscode/*.vsix
+          if-no-files-found: error

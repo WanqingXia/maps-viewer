@@ -16,29 +16,35 @@ export function mountGroupHeader(
 
   const root = document.createElement('div');
   root.className = 'mv-group-header';
+  root.setAttribute('role', 'group');
   root.dataset.groupId = group.id;
 
   const visBtn = document.createElement('button');
   visBtn.type = 'button';
   visBtn.className = 'mv-group-header__vis';
   visBtn.title = 'Toggle group visibility';
+  visBtn.setAttribute('aria-label', `Toggle visibility of group ${group.name}`);
 
   const swatch = document.createElement('button');
   swatch.type = 'button';
   swatch.className = 'mv-group-header__color';
   swatch.title = 'Change group color';
+  swatch.setAttribute('aria-label', `Change color of group ${group.name}`);
+  swatch.setAttribute('aria-haspopup', 'listbox');
 
   const name = document.createElement('input');
   name.type = 'text';
   name.className = 'mv-group-header__name';
   name.spellcheck = false;
   name.title = 'Rename group';
+  name.setAttribute('aria-label', 'Group name');
 
   const delBtn = document.createElement('button');
   delBtn.type = 'button';
   delBtn.className = 'mv-group-header__delete';
   delBtn.title = 'Delete group (members become ungrouped)';
   delBtn.textContent = '✕';
+  delBtn.setAttribute('aria-label', `Delete group ${group.name}`);
 
   root.appendChild(visBtn);
   root.appendChild(swatch);
@@ -68,8 +74,11 @@ export function mountGroupHeader(
   function update(next: Group): void {
     current = next;
     visBtn.setAttribute('aria-pressed', String(next.visible));
+    visBtn.setAttribute('aria-label', `Toggle visibility of group ${next.name}`);
     visBtn.textContent = next.visible ? '●' : '○';
     swatch.style.background = next.color;
+    swatch.setAttribute('aria-label', `Change color of group ${next.name}`);
+    delBtn.setAttribute('aria-label', `Delete group ${next.name}`);
     if (document.activeElement !== name) name.value = next.name;
   }
   update(group);
