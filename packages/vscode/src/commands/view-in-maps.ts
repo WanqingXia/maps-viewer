@@ -1,6 +1,4 @@
 import * as vscode from 'vscode';
-import { DEFAULT_LAYER_COLOR } from '@maps-viewer/shared';
-import { readGeoJsonFile } from '../util/parse-geojson.js';
 import { ensureToken } from '../token/prompt-for-token.js';
 import { MapPanel } from '../map-panel.js';
 import type { TokenManager } from '../token/token-manager.js';
@@ -14,7 +12,15 @@ export interface ViewInMapsCtx {
   logger: Logger;
 }
 
-/** Entry from the right-click menu or the command palette. */
+/**
+ * Entry point from the right-click context menu or the command palette.
+ *
+ * Behavior:
+ *   - If no panel is open: ensure token, open a new panel with this file.
+ *   - If a panel is already open in this window: ask whether to add the
+ *     file as a new layer in the existing panel, open a separate panel,
+ *     or cancel.
+ */
 export async function viewInMaps(ctx: ViewInMapsCtx, uri?: vscode.Uri): Promise<void> {
   const targetUri = uri ?? vscode.window.activeTextEditor?.document.uri;
   if (!targetUri) {
@@ -24,28 +30,49 @@ export async function viewInMaps(ctx: ViewInMapsCtx, uri?: vscode.Uri): Promise<
 
   try {
     const token = await ensureToken(ctx.tokenManager);
-    const fc = await readGeoJsonFile(targetUri);
     const fileName = targetUri.path.split('/').pop() ?? 'untitled.geojson';
-
     const defaultBasemap = vscode.workspace
       .getConfiguration('mapsViewer')
       .get<'standard' | 'satellite'>('defaultBasemap', 'standard');
 
+    const active = MapPanel.activeForWindow();
+    if (active) {
+      const choice = await vscode.window.showQuickPick(
+        [
+          {
+            label: '$(add) Add to current map',
+            description: 'Append as a new layer in the open panel',
+            id: 'add' as const,
+          },
+          {
+            label: '$(window) Open in new map',
+            description: 'Open a separate panel',
+            id: 'new' as const,
+          },
+        ],
+        { placeHolder: `A map is already open — what should "${fileName}" do?` },
+      );
+      if (!choice) return;
+      if (choice.id === 'add') {
+        await active.addFile(targetUri);
+        return;
+      }
+    }
+
+    const baseKey = targetUri.toString();
+    const key = MapPanel.activeForWindow() && !uri
+      ? `${baseKey}#${Date.now()}`
+      : baseKey;
+
     await MapPanel.show({
-      key: targetUri.toString(),
+      key,
       title: `Maps Viewer: ${fileName}`,
       extUri: ctx.extUri,
       webviewAssetsUri: ctx.webviewAssetsUri,
       logger: ctx.logger,
       mapboxToken: token,
       basemap: defaultBasemap,
-      layers: [{
-        layerId: `layer-${Date.now()}`,
-        fileName,
-        geojson: fc,
-        color: DEFAULT_LAYER_COLOR,
-        strokeWidth: 3,
-      }],
+      files: [targetUri],
     });
   } catch (err) {
     ctx.logger.error('viewInMaps failed', err);

@@ -1,11 +1,16 @@
 /**
- * Floating panel that shows the properties of the currently hovered feature.
- * Position-anchored to the map container; lives in its own DOM node so it can
- * sit above the Mapbox canvas without interfering with Mapbox's own popups.
+ * Floating panel that shows the layer name + properties of the currently
+ * hovered feature. Position-anchored to the map container; lives in its
+ * own DOM node so it can sit above the Mapbox canvas.
  */
 export interface PropertiesPopup {
-  show(x: number, y: number, props: Record<string, unknown>): void;
+  /**
+   * @param title  Layer display name shown as the popup heading (e.g. fileName)
+   * @param props  Feature properties (may be null for featureless geometries)
+   */
+  show(x: number, y: number, title: string, props: Record<string, unknown> | null): void;
   hide(): void;
+  destroy(): void;
 }
 
 const MAX_PROPS_SHOWN = 12;
@@ -13,25 +18,30 @@ const TRUNCATE_VALUE_AT = 80;
 
 export function mountPropertiesPopup(container: HTMLElement): PropertiesPopup {
   const root = document.createElement('div');
-  root.className = 'mv-props-popup';
+  root.className = 'mv-props-popup mv-popup';
   root.setAttribute('aria-hidden', 'true');
   root.style.display = 'none';
   container.append(root);
 
   return {
-    show(x, y, props) {
-      const keys = Object.keys(props);
+    show(x, y, title, props) {
+      const safeProps = props ?? {};
+      const keys = Object.keys(safeProps);
+      const titleHtml = `<div class="mv-popup__title">${escapeHtml(title)}</div>`;
       if (keys.length === 0) {
-        root.innerHTML = '<div class="mv-props-empty">(no properties)</div>';
+        root.innerHTML = `${titleHtml}<div class="mv-popup__empty">(no properties)</div>`;
       } else {
         const shown = keys.slice(0, MAX_PROPS_SHOWN);
         const rows = shown
-          .map((k) => `<dt>${escapeHtml(k)}</dt><dd>${escapeHtml(formatValue(props[k]))}</dd>`)
+          .map(
+            (k) =>
+              `<div class="mv-popup__row"><span class="mv-popup__key">${escapeHtml(k)}:</span><span class="mv-popup__value">${escapeHtml(formatValue(safeProps[k]))}</span></div>`,
+          )
           .join('');
         const more = keys.length > MAX_PROPS_SHOWN
-          ? `<div class="mv-props-more">+${keys.length - MAX_PROPS_SHOWN} more</div>`
+          ? `<div class="mv-popup__more">+${keys.length - MAX_PROPS_SHOWN} more</div>`
           : '';
-        root.innerHTML = `<dl>${rows}</dl>${more}`;
+        root.innerHTML = `${titleHtml}${rows}${more}`;
       }
       const rect = container.getBoundingClientRect();
       const popupW = root.offsetWidth || 240;
@@ -41,11 +51,16 @@ export function mountPropertiesPopup(container: HTMLElement): PropertiesPopup {
       root.style.left = `${xClamped}px`;
       root.style.top = `${yClamped}px`;
       root.style.display = 'block';
+      root.dataset.visible = 'true';
       root.setAttribute('aria-hidden', 'false');
     },
     hide() {
       root.style.display = 'none';
+      root.dataset.visible = 'false';
       root.setAttribute('aria-hidden', 'true');
+    },
+    destroy() {
+      root.remove();
     },
   };
 }

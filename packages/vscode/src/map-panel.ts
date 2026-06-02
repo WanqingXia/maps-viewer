@@ -1,69 +1,134 @@
 import * as vscode from 'vscode';
-import type { HostMessage, WebviewMessage, LayerInit, Basemap } from '@maps-viewer/shared';
+import type {
+  HostMessage,
+  WebviewMessage,
+  Layer,
+  LayerState,
+  LayerDataMap,
+  Basemap,
+  UserAction,
+  Project,
+  ProjectSnapshot,
+  ProjectCameraState,
+  ProjectFileRef,
+  CountryCode,
+  PrimaryKeyMap,
+} from '@maps-viewer/shared';
+import type { FeatureCollection, Geometry, Position } from 'geojson';
+import { EMPTY_LAYER_STATE, STROKE_WIDTH_DEFAULT } from '@maps-viewer/shared';
+import { reduce, assignColor, collectPkValues } from '@maps-viewer/core';
+import type { WorkspaceFolderInfo } from '@maps-viewer/core';
+import { toProjectFileRef } from '@maps-viewer/core';
+import { readGeoJsonFile } from './util/parse-geojson.js';
 import { getWebviewHtml } from './util/get-html.js';
 import type { Logger } from './util/logger.js';
 
 const VIEW_TYPE = 'mapsViewer.mapPanel';
+const DEFAULT_CAMERA: ProjectCameraState = { center: [0, 0], zoom: 1, bearing: 0, pitch: 0 };
+const CAMERA_RPC_TIMEOUT_MS = 2_000;
 
 export interface OpenMapPanelArgs {
   key: string;
   title: string;
   extUri: vscode.Uri;
-  /** Directory containing the bundled webview app + Mapbox vendor files. */
   webviewAssetsUri: vscode.Uri;
   logger: Logger;
   mapboxToken: string;
-  layers: ReadonlyArray<LayerInit>;
+  files: ReadonlyArray<vscode.Uri>;
   basemap?: Basemap;
 }
 
+export interface OpenFromProjectArgs {
+  key: string;
+  title: string;
+  extUri: vscode.Uri;
+  webviewAssetsUri: vscode.Uri;
+  logger: Logger;
+  mapboxToken: string;
+  project: Project;
+  layerData: Map<string, FeatureCollection>;
+}
+
 /**
- * Owns one VS Code webview panel + its message bridge.
+ * Owns one VS Code webview panel + its message bridge + the authoritative
+ * LayerState for that panel.
  *
- * Panels are keyed by file URI in Phase 1 (singleton-per-file); opening the
- * same file again reveals the existing panel and re-inits its layers rather
- * than spawning a duplicate. Phase 3 will switch the key to project id.
+ * Phase 3 + 4 additions:
+ *   - Tracks `country`, `primaryKeyByLayer` for the active project
+ *   - `getProjectSnapshot()` round-trips through the webview to capture
+ *     the live camera state
+ *   - `openFromProject()` restores a saved project (state + camera +
+ *     country + PK map) without going through file IO for the layers
+ *     (caller supplies a pre-loaded layerData Map)
+ *   - `setCountry` / `setPrimaryKey` / `locateFeature` for discovery
  */
 export class MapPanel {
   private static readonly panels = new Map<string, MapPanel>();
   private static lastFocused: MapPanel | undefined;
 
   private readonly disposables: vscode.Disposable[] = [];
-  private pendingInit: HostMessage | null = null;
   private webviewReady = false;
+  private pendingInit: HostMessage | null = null;
+  private readonly pendingActions: HostMessage[] = [];
+  private readonly cameraRequests = new Map<string, (camera: ProjectCameraState) => void>();
+  private rpcCounter = 0;
+
+  private layerState: LayerState = EMPTY_LAYER_STATE;
+  private readonly layerData = new Map<string, FeatureCollection>();
+  private readonly primaryKeyByLayer = new Map<string, string>();
+  private country: CountryCode | undefined = undefined;
+  private camera: ProjectCameraState = DEFAULT_CAMERA;
+  private readonly basemap: Basemap;
 
   private constructor(
     private readonly panel: vscode.WebviewPanel,
     private readonly logger: Logger,
     private readonly key: string,
+    private readonly mapboxToken: string,
+    basemap: Basemap,
   ) {
+    this.basemap = basemap;
     this.panel.onDidDispose(() => this.dispose(), null, this.disposables);
     this.panel.webview.onDidReceiveMessage(
       (msg: WebviewMessage) => this.onWebviewMessage(msg),
       null,
       this.disposables,
     );
-    this.panel.onDidChangeViewState((e) => {
-      if (e.webviewPanel.active) MapPanel.lastFocused = this;
-    }, null, this.disposables);
+    this.panel.onDidChangeViewState(
+      (e) => { if (e.webviewPanel.active) MapPanel.lastFocused = this; },
+      null,
+      this.disposables,
+    );
     MapPanel.lastFocused = this;
   }
+
+  // === public surface ===
 
   static activeForWindow(): MapPanel | undefined {
     return MapPanel.lastFocused;
   }
 
+  /** Get the existing panel for a given key, if open. */
+  static findByKey(key: string): MapPanel | undefined {
+    return MapPanel.panels.get(key);
+  }
+
+  /** Read-only access for command implementations. */
+  getKey(): string { return this.key; }
+  getLayerState(): LayerState { return this.layerState; }
+  getLayerData(layerId: string): FeatureCollection | undefined { return this.layerData.get(layerId); }
+  getPrimaryKeyFor(layerId: string): string | undefined { return this.primaryKeyByLayer.get(layerId); }
+  getCountry(): CountryCode | undefined { return this.country; }
+
+  /**
+   * Open (or reveal) a panel that loads one or more fresh GeoJSON files.
+   * Used by the View-in-Maps + Add-File flows.
+   */
   static async show(args: OpenMapPanelArgs): Promise<MapPanel> {
     const existing = MapPanel.panels.get(args.key);
     if (existing) {
       existing.panel.title = args.title;
       existing.panel.reveal(undefined, true);
-      existing.queueInit({
-        type: 'init',
-        mapboxToken: args.mapboxToken,
-        layers: args.layers,
-        basemap: args.basemap ?? 'standard',
-      });
       return existing;
     }
 
@@ -78,7 +143,13 @@ export class MapPanel {
       },
     );
 
-    const mp = new MapPanel(panel, args.logger, args.key);
+    const mp = new MapPanel(
+      panel,
+      args.logger,
+      args.key,
+      args.mapboxToken,
+      args.basemap ?? 'standard',
+    );
     panel.webview.html = getWebviewHtml({
       webview: panel.webview,
       extUri: args.extUri,
@@ -86,29 +157,227 @@ export class MapPanel {
       title: args.title,
     });
     MapPanel.panels.set(args.key, mp);
-    mp.queueInit({
-      type: 'init',
-      mapboxToken: args.mapboxToken,
-      layers: args.layers,
-      basemap: args.basemap ?? 'standard',
-    });
+
+    for (const fileUri of args.files) {
+      await mp.ingestFile(fileUri);
+    }
+
+    mp.queueInit();
     return mp;
   }
 
-  setBasemap(basemap: Basemap): void {
-    void this.post({ type: 'setBasemap', basemap });
+  /**
+   * Open (or reveal) a panel from a saved Project + pre-loaded layer data.
+   * Caller (open-project command) handles file IO + repath.
+   */
+  static async openFromProject(args: OpenFromProjectArgs): Promise<MapPanel> {
+    const existing = MapPanel.panels.get(args.key);
+    if (existing) {
+      existing.panel.title = args.title;
+      existing.panel.reveal(undefined, true);
+      return existing;
+    }
+
+    const panel = vscode.window.createWebviewPanel(
+      VIEW_TYPE,
+      args.title,
+      vscode.ViewColumn.Beside,
+      {
+        enableScripts: true,
+        retainContextWhenHidden: true,
+        localResourceRoots: [args.extUri, args.webviewAssetsUri],
+      },
+    );
+
+    const mp = new MapPanel(
+      panel,
+      args.logger,
+      args.key,
+      args.mapboxToken,
+      args.project.basemap,
+    );
+    panel.webview.html = getWebviewHtml({
+      webview: panel.webview,
+      extUri: args.extUri,
+      webviewAssetsUri: args.webviewAssetsUri,
+      title: args.title,
+    });
+    MapPanel.panels.set(args.key, mp);
+
+    mp.layerState = args.project.layerState;
+    for (const [id, fc] of args.layerData) mp.layerData.set(id, fc);
+    mp.country = args.project.country;
+    mp.camera = args.project.camera;
+    if (args.project.primaryKeyByLayer) {
+      for (const [layerId, pk] of Object.entries(args.project.primaryKeyByLayer)) {
+        mp.primaryKeyByLayer.set(layerId, pk);
+      }
+    }
+
+    mp.queueInit();
+    return mp;
   }
 
-  private queueInit(msg: Extract<HostMessage, { type: 'init' }>): void {
-    if (this.webviewReady) {
-      void this.post(msg);
-    } else {
-      this.pendingInit = msg;
+  /** Add one more GeoJSON file as a new layer. */
+  async addFile(uri: vscode.Uri): Promise<void> {
+    const layer = await this.ingestFile(uri);
+    if (!layer) return;
+    const data = this.layerData.get(layer.id);
+    if (!data) return;
+    this.queueOrPost({
+      type: 'applyAction',
+      action: { type: 'addLayer', layer },
+      layerData: { [layer.id]: data },
+    });
+  }
+
+  setBasemap(basemap: Basemap): void {
+    this.queueOrPost({ type: 'setBasemap', basemap });
+  }
+
+  setCountry(code: CountryCode | null): void {
+    this.country = code ?? undefined;
+    this.queueOrPost({ type: 'setCountry', country: code });
+  }
+
+  setPrimaryKey(layerId: string, key: string | null): void {
+    if (key) this.primaryKeyByLayer.set(layerId, key);
+    else this.primaryKeyByLayer.delete(layerId);
+    this.queueOrPost({ type: 'setPrimaryKey', layerId, key });
+  }
+
+  /**
+   * Resolve a PK value → feature id + centroid, then send `locate` to the
+   * webview. Returns true if the lookup found a match.
+   */
+  locateFeature(layerId: string, pkValue: string): boolean {
+    const pk = this.primaryKeyByLayer.get(layerId);
+    if (!pk) return false;
+    const fc = this.layerData.get(layerId);
+    if (!fc) return false;
+
+    let featureIndex = -1;
+    const target = String(pkValue);
+    for (let i = 0; i < fc.features.length; i++) {
+      const f = fc.features[i];
+      if (!f || !f.properties) continue;
+      if (String(f.properties[pk]) === target) {
+        featureIndex = i;
+        break;
+      }
     }
+    if (featureIndex < 0) return false;
+
+    const center = featureCentroid(fc.features[featureIndex]!.geometry);
+    if (!center) return false;
+
+    this.queueOrPost({ type: 'locate', layerId, featureId: featureIndex, center });
+    return true;
+  }
+
+  /** Build a ProjectSnapshot suitable for save-project — round-trips camera through the webview. */
+  async getProjectSnapshot(workspaces: ReadonlyArray<WorkspaceFolderInfo>): Promise<ProjectSnapshot> {
+    const camera = await this.requestCameraState();
+    this.camera = camera;
+    const files: ProjectFileRef[] = [];
+    for (const layer of this.layerState.layers) {
+      const absolute = vscode.Uri.parse(layer.sourcePath).fsPath;
+      files.push(toProjectFileRef(layer.id, absolute, workspaces));
+    }
+    const snapshot: ProjectSnapshot = {
+      files,
+      layerState: this.layerState,
+      basemap: this.basemap,
+      camera,
+    };
+    if (this.country) (snapshot as { country?: CountryCode }).country = this.country;
+    if (this.primaryKeyByLayer.size > 0) {
+      const pkMap: PrimaryKeyMap = {};
+      for (const [id, key] of this.primaryKeyByLayer) pkMap[id] = key;
+      (snapshot as { primaryKeyByLayer?: PrimaryKeyMap }).primaryKeyByLayer = pkMap;
+    }
+    return snapshot;
+  }
+
+  // === private ===
+
+  private async ingestFile(uri: vscode.Uri): Promise<Layer | null> {
+    let fc: FeatureCollection;
+    try {
+      fc = await readGeoJsonFile(uri);
+    } catch (err) {
+      this.logger.error(`addFile failed for ${uri.toString()}`, err);
+      const msg = err instanceof Error ? err.message : String(err);
+      void vscode.window.showErrorMessage(`Maps Viewer: ${msg}`);
+      return null;
+    }
+    const fileName = uri.path.split('/').pop() ?? 'untitled.geojson';
+    const id = `layer-${Date.now()}-${this.layerState.layers.length}`;
+    const layer: Layer = {
+      id,
+      fileName,
+      displayName: fileName,
+      sourcePath: uri.toString(),
+      color: assignColor(this.layerState.layers.length),
+      strokeWidth: STROKE_WIDTH_DEFAULT,
+      visible: true,
+      groupId: null,
+      featureCount: fc.features.length,
+    };
+    this.layerState = reduce(this.layerState, { type: 'addLayer', layer });
+    this.layerData.set(id, fc);
+    return layer;
+  }
+
+  private queueInit(): void {
+    const payload: LayerDataMap = {};
+    for (const [layerId, data] of this.layerData) payload[layerId] = data;
+    const pkMap: PrimaryKeyMap = {};
+    for (const [id, key] of this.primaryKeyByLayer) pkMap[id] = key;
+
+    const msg: HostMessage = {
+      type: 'init',
+      mapboxToken: this.mapboxToken,
+      state: this.layerState,
+      layerData: payload,
+      basemap: this.basemap,
+      ...(this.country ? { country: this.country } : {}),
+      ...(this.primaryKeyByLayer.size > 0 ? { primaryKeyByLayer: pkMap } : {}),
+      ...(this.camera !== DEFAULT_CAMERA ? { camera: this.camera } : {}),
+    };
+    if (this.webviewReady) void this.post(msg);
+    else this.pendingInit = msg;
+  }
+
+  private queueOrPost(msg: HostMessage): void {
+    if (this.webviewReady) void this.post(msg);
+    else this.pendingActions.push(msg);
   }
 
   private post(msg: HostMessage): Thenable<boolean> {
     return this.panel.webview.postMessage(msg);
+  }
+
+  private requestCameraState(): Promise<ProjectCameraState> {
+    if (!this.webviewReady) {
+      return Promise.resolve(this.camera);
+    }
+    const requestId = `cam-${++this.rpcCounter}`;
+    return new Promise<ProjectCameraState>((resolve) => {
+      let resolved = false;
+      this.cameraRequests.set(requestId, (camera) => {
+        if (resolved) return;
+        resolved = true;
+        resolve(camera);
+      });
+      void this.post({ type: 'requestCameraState', requestId });
+      setTimeout(() => {
+        if (resolved) return;
+        resolved = true;
+        this.cameraRequests.delete(requestId);
+        resolve(this.camera);
+      }, CAMERA_RPC_TIMEOUT_MS);
+    });
   }
 
   private onWebviewMessage(msg: WebviewMessage): void {
@@ -120,15 +389,39 @@ export class MapPanel {
           void this.post(this.pendingInit);
           this.pendingInit = null;
         }
+        while (this.pendingActions.length > 0) {
+          const next = this.pendingActions.shift();
+          if (next) void this.post(next);
+        }
         break;
       case 'mapLoaded':
         this.logger.info(`map loaded (key=${this.key})`);
         break;
+      case 'requestAction':
+        this.handleUserAction(msg.action);
+        break;
+      case 'cameraState': {
+        const handler = this.cameraRequests.get(msg.requestId);
+        if (handler) {
+          this.cameraRequests.delete(msg.requestId);
+          handler(msg.camera);
+        }
+        break;
+      }
       case 'error':
         this.logger.error(`webview error: ${msg.message}${msg.code ? ` (${msg.code})` : ''}`);
         void vscode.window.showErrorMessage(`Maps Viewer: ${msg.message}`);
         break;
     }
+  }
+
+  private handleUserAction(action: UserAction): void {
+    this.layerState = reduce(this.layerState, action);
+    if (action.type === 'removeLayer') {
+      this.layerData.delete(action.layerId);
+      this.primaryKeyByLayer.delete(action.layerId);
+    }
+    void this.post({ type: 'applyAction', action });
   }
 
   private dispose(): void {
@@ -139,4 +432,55 @@ export class MapPanel {
       try { d?.dispose(); } catch { /* noop */ }
     }
   }
+}
+
+// === Helpers ===
+
+function featureCentroid(g: Geometry | null): [number, number] | null {
+  if (!g) return null;
+  switch (g.type) {
+    case 'Point':
+      return g.coordinates as [number, number];
+    case 'MultiPoint':
+    case 'LineString':
+      return midOfLine(g.coordinates as ReadonlyArray<Position>);
+    case 'MultiLineString':
+      return midOfLine(((g.coordinates as ReadonlyArray<ReadonlyArray<Position>>)[0]) ?? []);
+    case 'Polygon':
+      return bboxCenter((g.coordinates as ReadonlyArray<ReadonlyArray<Position>>)[0] ?? []);
+    case 'MultiPolygon': {
+      const first = g.coordinates as ReadonlyArray<ReadonlyArray<ReadonlyArray<Position>>>;
+      if (first.length === 0 || first[0]!.length === 0) return null;
+      return bboxCenter(first[0]![0]!);
+    }
+    case 'GeometryCollection':
+      for (const inner of g.geometries) {
+        const c = featureCentroid(inner);
+        if (c) return c;
+      }
+      return null;
+    default:
+      return null;
+  }
+}
+
+function midOfLine(coords: ReadonlyArray<Position>): [number, number] | null {
+  if (coords.length === 0) return null;
+  if (coords.length === 1) return [coords[0]![0]!, coords[0]![1]!];
+  const mid = coords[Math.floor(coords.length / 2)]!;
+  return [mid[0]!, mid[1]!];
+}
+
+function bboxCenter(coords: ReadonlyArray<Position>): [number, number] | null {
+  if (coords.length === 0) return null;
+  let minLng = Infinity, minLat = Infinity, maxLng = -Infinity, maxLat = -Infinity;
+  for (const p of coords) {
+    const lng = p[0]!, lat = p[1]!;
+    if (lng < minLng) minLng = lng;
+    if (lat < minLat) minLat = lat;
+    if (lng > maxLng) maxLng = lng;
+    if (lat > maxLat) maxLat = lat;
+  }
+  if (!isFinite(minLng)) return null;
+  return [(minLng + maxLng) / 2, (minLat + maxLat) / 2];
 }

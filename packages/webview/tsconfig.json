@@ -4,7 +4,11 @@
     "noEmit": true,
     "composite": false,
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
-    "types": ["vite/client", "geojson"]
+    "types": ["vite/client", "geojson"],
+    "baseUrl": ".",
+    "paths": {
+      "@maps-viewer/shared": ["../shared/dist/index.d.ts"]
+    }
   },
   "include": ["src/**/*"]
 }

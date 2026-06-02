@@ -20,7 +20,8 @@
     "test:watch": "vitest"
   },
   "dependencies": {
-    "@maps-viewer/shared": "workspace:*"
+    "@maps-viewer/shared": "workspace:*",
+    "zod": "^3.23.0"
   },
   "devDependencies": {
     "@types/geojson": "^7946.0.14",

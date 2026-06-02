@@ -1,69 +1,60 @@
+import type { PropertiesPopup } from '../ui/properties-popup.js';
 import { sublayerIds } from './render-layer.js';
 
-interface PopupHandle {
-  show(x: number, y: number, props: Record<string, unknown>): void;
-  hide(): void;
-}
-
 /**
- * Attach hover-to-highlight + properties-popup behavior to a layer.
+ * Wire hover highlight + properties popup for a layer's 3 sublayers.
  *
- * On `mousemove` over any of the layer's three sub-layers:
- *   - set canvas cursor to pointer
- *   - clear previous hover feature-state, set hover=true on the new one
- *   - show the popup with the feature's properties
+ * `getLayerName` is called every mouseenter so renaming via Layer state
+ * is reflected immediately — no need to re-wire on every rename.
  *
- * On `mouseleave` (when the mouse exits all three sub-layers):
- *   - clear the cursor, hover state, and popup
+ * Returns a disposer that removes all listeners + clears active hover.
  */
 export function wireHover(
-  map: unknown,
+  map: MapboxMapInstance,
   layerId: string,
-  popup: PopupHandle,
-): void {
-  const mapAny = map as {
-    getCanvas(): HTMLCanvasElement;
-    on(event: string, layer: string, handler: (e: HoverEvent) => void): void;
-    off(event: string, handler: (e: unknown) => void): void;
-    setFeatureState(t: { source: string; id: number | string }, s: Record<string, unknown>): void;
-    removeFeatureState(t: { source: string; id?: number | string }): void;
-  };
-
-  let lastHoverId: number | string | null = null;
+  popup: PropertiesPopup,
+  getLayerName: () => string,
+): () => void {
   const sublayers = sublayerIds(layerId);
+  let lastFeatureId: number | string | null = null;
 
-  const onMove = (e: HoverEvent) => {
-    const f = e.features?.[0];
-    if (!f || f.id == null) return;
-    mapAny.getCanvas().style.cursor = 'pointer';
-    if (lastHoverId !== null && lastHoverId !== f.id) {
-      mapAny.setFeatureState({ source: layerId, id: lastHoverId }, { hover: false });
-    }
-    lastHoverId = f.id;
-    mapAny.setFeatureState({ source: layerId, id: f.id }, { hover: true });
-    const [x, y] = [e.point.x, e.point.y];
-    popup.show(x, y, f.properties ?? {});
+  const setHover = (featureId: number | string, on: boolean): void => {
+    map.setFeatureState({ source: layerId, id: featureId }, { hover: on });
   };
 
-  const onLeave = () => {
-    mapAny.getCanvas().style.cursor = '';
-    if (lastHoverId !== null) {
-      mapAny.setFeatureState({ source: layerId, id: lastHoverId }, { hover: false });
-      lastHoverId = null;
+  const clearHover = (): void => {
+    if (lastFeatureId !== null) {
+      setHover(lastFeatureId, false);
+      lastFeatureId = null;
     }
     popup.hide();
   };
 
-  for (const subId of sublayers) {
-    mapAny.on('mousemove', subId, onMove);
-    mapAny.on('mouseleave', subId, onLeave);
-  }
-}
+  const handleMove = (e: unknown): void => {
+    const event = e as {
+      features?: ReadonlyArray<{ id?: number | string; properties?: Record<string, unknown> | null }>;
+      point?: { x: number; y: number };
+    };
+    const feature = event.features?.[0];
+    if (!feature || feature.id == null) return;
+    if (lastFeatureId !== null && lastFeatureId !== feature.id) setHover(lastFeatureId, false);
+    lastFeatureId = feature.id;
+    setHover(feature.id, true);
+    if (event.point) popup.show(event.point.x, event.point.y, getLayerName(), feature.properties ?? null);
+  };
 
-interface HoverEvent {
-  point: { x: number; y: number };
-  features?: Array<{
-    id: number | string | undefined;
-    properties: Record<string, unknown> | null;
-  }>;
+  const handleLeave = (): void => clearHover();
+
+  for (const sub of sublayers) {
+    map.on('mousemove', sub, handleMove);
+    map.on('mouseleave', sub, handleLeave);
+  }
+
+  return () => {
+    for (const sub of sublayers) {
+      map.off('mousemove', sub, handleMove);
+      map.off('mouseleave', sub, handleLeave);
+    }
+    clearHover();
+  };
 }

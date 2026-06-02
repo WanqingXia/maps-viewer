@@ -1,38 +1,79 @@
 import { describe, it, expect } from 'vitest';
-import type { HostMessage, WebviewMessage, LayerInit } from '@maps-viewer/shared';
-import { POST_MESSAGE_VERSION } from '@maps-viewer/shared';
+import type {
+  HostMessage,
+  WebviewMessage,
+  Layer,
+  LayerState,
+  UserAction,
+} from '@maps-viewer/shared';
+import { POST_MESSAGE_VERSION, EMPTY_LAYER_STATE } from '@maps-viewer/shared';
 
-describe('postMessage protocol', () => {
-  it('init message has expected shape', () => {
-    const layer: LayerInit = {
-      layerId: 'l1',
-      fileName: 'x.geojson',
-      geojson: { type: 'FeatureCollection', features: [] },
-      color: '#e6194b',
-      strokeWidth: 3,
+const sampleLayer: Layer = {
+  id: 'layer-1',
+  fileName: 'sample.geojson',
+  displayName: 'Sample',
+  sourcePath: 'file:///tmp/sample.geojson',
+  color: '#e6194b',
+  strokeWidth: 3,
+  visible: true,
+  groupId: null,
+  featureCount: 1,
+};
+
+const sampleState: LayerState = { ...EMPTY_LAYER_STATE, layers: [sampleLayer] };
+
+describe('HostMessage shapes', () => {
+  it('init carries token, state, layerData, and basemap', () => {
+    const msg: HostMessage = {
+      type: 'init',
+      mapboxToken: 'pk.test',
+      state: sampleState,
+      layerData: { 'layer-1': { type: 'FeatureCollection', features: [] } },
+      basemap: 'standard',
     };
-    const msg: HostMessage = { type: 'init', mapboxToken: 'pk.x', layers: [layer], basemap: 'standard' };
     expect(msg.type).toBe('init');
-    expect(msg.layers[0].layerId).toBe('l1');
+    expect(msg.state.layers).toHaveLength(1);
+    expect(msg.basemap).toBe('standard');
   });
 
-  it('setBasemap message accepts both basemaps', () => {
-    const a: HostMessage = { type: 'setBasemap', basemap: 'standard' };
-    const b: HostMessage = { type: 'setBasemap', basemap: 'satellite' };
-    expect(a.basemap).toBe('standard');
-    expect(b.basemap).toBe('satellite');
+  it('applyAction carries an action and optional layerData', () => {
+    const msg: HostMessage = {
+      type: 'applyAction',
+      action: { type: 'setLayerVisible', layerId: 'layer-1', visible: false },
+    };
+    expect(msg.type).toBe('applyAction');
+    expect(msg.layerData).toBeUndefined();
   });
 
-  it('webview replies fit the discriminated union', () => {
-    const ready: WebviewMessage = { type: 'ready' };
-    const loaded: WebviewMessage = { type: 'mapLoaded' };
-    const err: WebviewMessage = { type: 'error', message: 'boom', code: 'NO_MAPBOX' };
-    expect(ready.type).toBe('ready');
-    expect(loaded.type).toBe('mapLoaded');
-    expect(err.message).toBe('boom');
+  it('setBasemap is a discrete narrow message', () => {
+    const msg: HostMessage = { type: 'setBasemap', basemap: 'satellite' };
+    expect(msg.basemap).toBe('satellite');
+  });
+});
+
+describe('WebviewMessage shapes', () => {
+  it('requestAction excludes addLayer at the type level', () => {
+    const action: UserAction = { type: 'setLayerColor', layerId: 'layer-1', color: '#3cb44b' };
+    const msg: WebviewMessage = { type: 'requestAction', action };
+    expect(msg.type).toBe('requestAction');
+    // @ts-expect-error addLayer is not in UserAction
+    const bad: UserAction = { type: 'addLayer', layer: sampleLayer };
+    void bad;
   });
 
-  it('exports a protocol version constant', () => {
-    expect(POST_MESSAGE_VERSION).toBe(1);
+  it('ready / mapLoaded / error are all valid variants', () => {
+    const a: WebviewMessage = { type: 'ready' };
+    const b: WebviewMessage = { type: 'mapLoaded' };
+    const c: WebviewMessage = { type: 'error', message: 'oops', code: 'X' };
+    expect(a.type).toBe('ready');
+    expect(b.type).toBe('mapLoaded');
+    expect(c.code).toBe('X');
+  });
+});
+
+describe('protocol version', () => {
+  it('exposes a numeric POST_MESSAGE_VERSION', () => {
+    expect(typeof POST_MESSAGE_VERSION).toBe('number');
+    expect(POST_MESSAGE_VERSION).toBeGreaterThanOrEqual(1);
   });
 });

@@ -1,3 +1,8 @@
-// Reserved for engine-agnostic logic exposed to the rest of the workspace.
-// Phase 0 ships an empty surface; later phases populate this barrel.
-export {};
+export * from './layers/layer-state.js';
+export * from './colors/assign-color.js';
+export * from './bbox/country-bboxes.js';
+export * from './geom/feature-size.js';
+export * from './pk/extract-pk-keys.js';
+export * from './storage/path-resolver.js';
+export * from './storage/project-schema.js';
+export * from './dot-rules.js';

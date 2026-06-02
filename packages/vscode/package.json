@@ -12,13 +12,49 @@
   "main": "./dist/extension.cjs",
   "activationEvents": [
     "onCommand:mapsViewer.viewInMaps",
-    "onCommand:mapsViewer.setMapboxToken"
+    "onCommand:mapsViewer.setMapboxToken",
+    "onCommand:mapsViewer.addFileToMap",
+    "onCommand:mapsViewer.locateFeature",
+    "onCommand:mapsViewer.setCountryScope",
+    "onCommand:mapsViewer.setPrimaryKey",
+    "onCommand:mapsViewer.saveProject",
+    "onCommand:mapsViewer.openProject",
+    "onView:mapsViewer.tree"
   ],
   "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "mapsViewerContainer",
+          "title": "Maps Manager",
+          "icon": "resources/maps-manager.svg"
+        }
+      ]
+    },
+    "views": {
+      "mapsViewerContainer": [
+        {
+          "id": "mapsViewer.tree",
+          "name": "Maps Manager",
+          "icon": "resources/maps-manager.svg",
+          "contextualTitle": "Maps Manager"
+        }
+      ]
+    },
     "commands": [
       { "command": "mapsViewer.about", "title": "Maps Viewer: About" },
       { "command": "mapsViewer.viewInMaps", "title": "View in Maps", "category": "Maps Viewer" },
-      { "command": "mapsViewer.setMapboxToken", "title": "Set Mapbox Token…", "category": "Maps Viewer" }
+      { "command": "mapsViewer.setMapboxToken", "title": "Set Mapbox Token…", "category": "Maps Viewer" },
+      { "command": "mapsViewer.addFileToMap", "title": "Add File to Current Map…", "category": "Maps Viewer" },
+      { "command": "mapsViewer.locateFeature", "title": "Locate Feature…", "category": "Maps Viewer" },
+      { "command": "mapsViewer.setCountryScope", "title": "Set Country Scope…", "category": "Maps Viewer" },
+      { "command": "mapsViewer.setPrimaryKey", "title": "Set Primary Key…", "category": "Maps Viewer" },
+      { "command": "mapsViewer.saveProject", "title": "Save as Project…", "category": "Maps Viewer" },
+      { "command": "mapsViewer.openProject", "title": "Open Map Project", "category": "Maps Viewer", "icon": "$(open-preview)" },
+      { "command": "mapsViewer.renameProject", "title": "Rename Project…", "category": "Maps Viewer", "icon": "$(edit)" },
+      { "command": "mapsViewer.deleteProject", "title": "Delete Project", "category": "Maps Viewer", "icon": "$(trash)" },
+      { "command": "mapsViewer.newProject", "title": "New Map Project", "category": "Maps Viewer", "icon": "$(add)" },
+      { "command": "mapsViewer.refreshMapsTree", "title": "Refresh", "category": "Maps Viewer", "icon": "$(refresh)" }
     ],
     "menus": {
       "explorer/context": [
@@ -41,6 +77,21 @@
           "when": "resourceExtname == .geojson",
           "group": "navigation@10"
         }
+      ],
+      "view/title": [
+        { "command": "mapsViewer.newProject", "when": "view == mapsViewer.tree", "group": "navigation@1" },
+        { "command": "mapsViewer.refreshMapsTree", "when": "view == mapsViewer.tree", "group": "navigation@2" }
+      ],
+      "view/item/context": [
+        { "command": "mapsViewer.openProject", "when": "view == mapsViewer.tree && viewItem == project", "group": "inline@1" },
+        { "command": "mapsViewer.renameProject", "when": "view == mapsViewer.tree && viewItem == project", "group": "inline@2" },
+        { "command": "mapsViewer.deleteProject", "when": "view == mapsViewer.tree && viewItem == project", "group": "inline@3" }
+      ],
+      "commandPalette": [
+        { "command": "mapsViewer.openProject", "when": "false" },
+        { "command": "mapsViewer.renameProject", "when": "false" },
+        { "command": "mapsViewer.deleteProject", "when": "false" },
+        { "command": "mapsViewer.refreshMapsTree", "when": "false" }
       ]
     },
     "configuration": {
@@ -51,6 +102,11 @@
           "enum": ["standard", "satellite"],
           "default": "standard",
           "description": "Basemap shown when a map first opens."
+        },
+        "mapsViewer.mapsLocation": {
+          "type": "string",
+          "default": "",
+          "description": "Optional absolute path to a maps.json file. When empty, the extension uses VS Code's per-extension global storage. Point this at a synced folder (iCloud, Dropbox) to share saved projects across machines."
         }
       }
     }
@@ -63,7 +119,8 @@
   },
   "dependencies": {
     "@maps-viewer/shared": "workspace:*",
-    "@maps-viewer/core": "workspace:*"
+    "@maps-viewer/core": "workspace:*",
+    "zod": "^3.23.0"
   },
   "devDependencies": {
     "@maps-viewer/webview": "workspace:*",

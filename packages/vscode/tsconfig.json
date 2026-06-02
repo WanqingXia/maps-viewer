@@ -4,7 +4,12 @@
     "noEmit": true,
     "composite": false,
     "lib": ["ES2022"],
-    "types": ["node", "vscode", "geojson"]
+    "types": ["node", "vscode", "geojson"],
+    "baseUrl": ".",
+    "paths": {
+      "@maps-viewer/shared": ["../shared/dist/index.d.ts"],
+      "@maps-viewer/core": ["../core/dist/index.d.ts"]
+    }
   },
   "include": ["src/**/*"]
 }
