@@ -295,7 +295,7 @@ function buildLayerMeta(fc: FeatureCollection): LayerFeatureMetaMap[string] {
     }
     featuresByKey[key] = values;
   }
-  return { propertyKeys, featuresByKey };
+  return { featureCount: fc.features.length, propertyKeys, featuresByKey };
 }
 
 const WORLD_BBOX: [number, number, number, number] = [-180, -85, 180, 85];

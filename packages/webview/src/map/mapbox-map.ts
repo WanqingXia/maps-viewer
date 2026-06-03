@@ -21,7 +21,7 @@ const STYLES: Record<Basemap, string> = {
 
 const POINT_LOCATE_ZOOM_DEFAULT = 16;
 const LOCATE_PULSE_MS = 1500;
-const COUNTRY_VIEW_FACTOR = 1.5;
+const COUNTRY_VIEW_FACTOR = 2;
 
 export class MapboxMap {
   private readonly map: MapboxMapInstance;

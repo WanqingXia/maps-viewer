@@ -468,7 +468,7 @@ export class MapPanel {
         }
         featuresByKey[key] = values;
       }
-      out[layerId] = { propertyKeys, featuresByKey };
+      out[layerId] = { featureCount: fc.features.length, propertyKeys, featuresByKey };
     }
     return out;
   }

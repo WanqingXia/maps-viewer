@@ -27,6 +27,7 @@ export interface FeatureOption {
 
 /** Per-layer property keys and PK values derived from the loaded GeoJSON. */
 export interface LayerFeatureMeta {
+  readonly featureCount: number;
   readonly propertyKeys: ReadonlyArray<string>;
   readonly featuresByKey: Readonly<Record<string, ReadonlyArray<FeatureOption>>>;
 }

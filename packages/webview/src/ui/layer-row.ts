@@ -52,7 +52,10 @@ export function mountLayerRow(
   name.title = current.displayName;
   name.setAttribute('aria-label', 'Layer name');
 
-  const delBtn = iconButton('mv-layer-row__delete', `Remove layer ${current.displayName}`, 'Remove');
+  const rowCount = document.createElement('span');
+  rowCount.className = 'mv-layer-row__row-count';
+
+  const delBtn = iconButton('mv-layer-row__delete', `Remove layer ${current.displayName}`, '×');
 
   const stroke = mountStrokeSlider(current.strokeWidth, (width) =>
     onAction({ type: 'setLayerStrokeWidth', layerId: current.id, width }),
@@ -85,7 +88,7 @@ export function mountLayerRow(
   recordsList.className = 'mv-layer-row__records-list';
   records.append(recordsToolbar, recordsList);
 
-  row.append(move, visBtn, swatch, name, delBtn, stroke.element, pk, expandBtn, records);
+  row.append(move, visBtn, swatch, name, rowCount, delBtn, stroke.element, pk, expandBtn, records);
 
   const picker = mountColorPicker((color) =>
     onAction({ type: 'setLayerColor', layerId: current.id, color }),
@@ -171,6 +174,8 @@ export function mountLayerRow(
     swatch.disabled = current.groupId !== null;
     swatch.setAttribute('aria-label', current.groupId ? 'Grouped layers use group color' : `Change color of layer ${current.displayName}`);
     delBtn.setAttribute('aria-label', `Remove layer ${current.displayName}`);
+    rowCount.textContent = `rows: ${currentOptions.meta?.featureCount ?? 0}`;
+    rowCount.title = rowCount.textContent;
     if (document.activeElement !== name) {
       name.value = current.displayName;
       name.title = current.displayName;
