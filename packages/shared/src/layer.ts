@@ -14,7 +14,7 @@ import type { ColorHex } from './colors.js';
  *     scoped per-layer via Mapbox's `generateId: true`.
  *   - `Layer.color` is the render color. Grouped layers track their group
  *     color and do not expose independent color controls in the UI.
- *   - `Layer.strokeWidth` is the line/circle stroke width (0–50; the
+ *   - `Layer.strokeWidth` is the line/circle stroke width (0–30; the
  *     reducer clamps).
  *   - `Layer.visible` is independent of group visibility; both must be
  *     true for the layer to render. Group visibility is enforced at the
@@ -78,7 +78,7 @@ export type UserAction = Exclude<LayerAction, { type: 'addLayer' }>;
 
 export const EMPTY_LAYER_STATE: LayerState = { layers: [], groups: [] };
 
-/** Stroke width bounds (PRD: 0–50, default 3). */
+/** Stroke width bounds (current UI: 0–30, default 3). */
 export const STROKE_WIDTH_MIN = 0;
-export const STROKE_WIDTH_MAX = 50;
+export const STROKE_WIDTH_MAX = 30;
 export const STROKE_WIDTH_DEFAULT = 3;

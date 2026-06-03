@@ -23,7 +23,7 @@ import { STROKE_WIDTH_MIN, STROKE_WIDTH_MAX } from '@maps-viewer/shared';
  *   - Unknown action types throw at compile time via the exhaustive
  *     switch + `never` check; at runtime an unknown action returns the
  *     original state.
- *   - `setLayerStrokeWidth` clamps to [0, 50].
+ *   - `setLayerStrokeWidth` clamps to [0, 30].
  */
 export function reduce(state: LayerState, action: LayerAction): LayerState {
   switch (action.type) {

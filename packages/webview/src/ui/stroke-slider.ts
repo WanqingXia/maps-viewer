@@ -7,7 +7,7 @@ export interface StrokeSliderEl {
 }
 
 /**
- * Range input 0..50 with a live numeric readout. Emits onChange on `input`
+ * Range input 0..30 with a live numeric readout. Emits onChange on `input`
  * (live drag) but throttles via requestAnimationFrame so we don't spam
  * the reducer on every pixel of slider travel.
  */

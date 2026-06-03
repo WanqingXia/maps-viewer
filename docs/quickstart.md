@@ -32,7 +32,7 @@ The LayersPanel sits on the left of the map panel:
 - **● dot** — toggle visibility
 - **Color swatch** — opens the 22-swatch picker
 - **Layer name** — click and edit to rename
-- **Stroke slider** — drag 0–50 for line thickness
+- **Stroke slider** — drag 0–30 for line thickness
 - **✕** — remove the layer
 
 ## 5. Save as a project

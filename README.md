@@ -21,7 +21,7 @@ Right-click any `.geojson` file → **View in Maps** → see it on a real map wi
 - **Locate by primary key** — set a PK column once, then Cmd+Shift+P → type any value → fly to the feature
 - **Country scoping** — pick from 47 curated countries to limit the view
 - **Small-feature-as-dot** — sub-100m features render as 4px circles at low zoom so nothing disappears
-- **Adjustable stroke width** — 0–50 per layer, live preview as you drag
+- **Adjustable stroke width** — 0–30 per layer, live preview as you drag
 - **BYO Mapbox token** — your token stays on your machine via VS Code's SecretStorage; never shared
 
 ## Quickstart

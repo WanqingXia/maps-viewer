@@ -10,7 +10,7 @@ import { EMPTY_MAPS_JSON } from '@maps-viewer/shared';
  * - Color values are validated as `#RRGGBB` / `#RRGGBBAA` etc. — anything
  *   that starts with `#` and has 3-8 hex chars.
  * - ISO 8601 strings for timestamps.
- * - Stroke width is clamped to [0, 50] when parsing in (matching the
+ * - Stroke width is clamped to [0, 30] when parsing in (matching the
  *   reducer's runtime clamp).
  */
 
@@ -39,7 +39,7 @@ const LayerSchema = z.object({
   displayName: z.string(),
   sourcePath: z.string(),
   color: Color,
-  strokeWidth: z.number().min(0).max(50),
+  strokeWidth: z.number().min(0).max(30),
   visible: z.boolean(),
   groupId: z.string().nullable(),
   featureCount: z.number().int().nonnegative(),

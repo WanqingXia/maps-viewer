@@ -424,6 +424,12 @@ export class MapPanel {
           void vscode.window.showWarningMessage('Maps Viewer: feature not found.');
         }
         break;
+      case 'addLayerRequest':
+        void vscode.commands.executeCommand('mapsViewer.addFileToMap');
+        break;
+      case 'saveProjectRequest':
+        void vscode.commands.executeCommand('mapsViewer.saveProject');
+        break;
       case 'cameraState': {
         const handler = this.cameraRequests.get(msg.requestId);
         if (handler) {

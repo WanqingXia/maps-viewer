@@ -23,7 +23,7 @@ First public-release candidate. Built across 5 phases.
 - 22-color palette (20 auto-assigned + white + black manual override)
 - LayersPanel sidebar with per-layer view/hide, rename, delete
 - Color picker dropdown (22 swatches)
-- Stroke width slider 0–50 with live preview
+- Stroke width slider 0–30 with live preview
 - Layer grouping data model (createGroup / setGroupColor cascade / deleteGroup)
 - Quick-pick when adding a 2nd file: "Add to current map" vs "Open in new map"
 - `Maps Viewer: Add File to Current Map…` palette command

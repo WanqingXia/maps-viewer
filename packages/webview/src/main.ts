@@ -72,6 +72,10 @@ function ensurePanelContainer(): HTMLElement {
     el = document.createElement('div');
     el.id = 'panel-host';
     document.body.appendChild(el);
+    const resizer = document.createElement('div');
+    resizer.id = 'panel-resizer';
+    resizer.setAttribute('aria-hidden', 'true');
+    document.body.appendChild(resizer);
   }
   return el;
 }
@@ -195,6 +199,19 @@ async function handleInit(msg: Extract<HostMessage, { type: 'init' }>): Promise<
       map?.setFeatureVisible(layerId, featureId, visible);
       updatePanel();
     },
+    (layerId, featureIds, visible) => {
+      const hidden = hiddenFeatureIds.get(layerId) ?? new Set<number | string>();
+      for (const featureId of featureIds) {
+        if (visible) hidden.delete(featureId);
+        else hidden.add(featureId);
+        map?.setFeatureVisible(layerId, featureId, visible);
+      }
+      if (hidden.size === 0) hiddenFeatureIds.delete(layerId);
+      else hiddenFeatureIds.set(layerId, hidden);
+      updatePanel();
+    },
+    () => send({ type: 'addLayerRequest' }),
+    () => send({ type: 'saveProjectRequest' }),
   );
 
   map.whenReady(() => {
@@ -213,14 +230,35 @@ async function handleInit(msg: Extract<HostMessage, { type: 'init' }>): Promise<
 }
 
 function wirePanelResize(panelContainer: HTMLElement): void {
+  const resizer = document.getElementById('panel-resizer');
+  let dragging = false;
   const update = (): void => {
     document.documentElement.style.setProperty('--mv-panel-width', `${panelContainer.getBoundingClientRect().width}px`);
   };
   update();
-  if ('ResizeObserver' in window) {
-    const observer = new ResizeObserver(update);
-    observer.observe(panelContainer);
-  }
+  resizer?.addEventListener('pointerdown', (event) => {
+    dragging = true;
+    resizer.setPointerCapture(event.pointerId);
+    document.body.dataset.resizingPanel = 'true';
+    event.preventDefault();
+  });
+  resizer?.addEventListener('pointermove', (event) => {
+    if (!dragging) return;
+    const nextWidth = Math.max(320, Math.min(520, event.clientX));
+    document.documentElement.style.setProperty('--mv-panel-width', `${nextWidth}px`);
+    event.preventDefault();
+  });
+  resizer?.addEventListener('pointerup', (event) => {
+    if (!dragging) return;
+    dragging = false;
+    document.body.dataset.resizingPanel = 'false';
+    resizer.releasePointerCapture(event.pointerId);
+    event.preventDefault();
+  });
+  resizer?.addEventListener('pointercancel', () => {
+    dragging = false;
+    document.body.dataset.resizingPanel = 'false';
+  });
 }
 
 function handleApplyAction(msg: Extract<HostMessage, { type: 'applyAction' }>): void {

@@ -21,6 +21,7 @@ const STYLES: Record<Basemap, string> = {
 
 const POINT_LOCATE_ZOOM_DEFAULT = 16;
 const LOCATE_PULSE_MS = 1500;
+const COUNTRY_VIEW_FACTOR = 1.5;
 
 export class MapboxMap {
   private readonly map: MapboxMapInstance;
@@ -222,11 +223,17 @@ export class MapboxMap {
    */
   setCountry(code: CountryCode | null, bbox: readonly [number, number, number, number]): void {
     const bounds: [[number, number], [number, number]] = [[bbox[0], bbox[1]], [bbox[2], bbox[3]]];
-    this.map.setMaxBounds(code ? expandedBounds(bbox, 1.5) : null);
+    const countryViewBounds = code ? expandedBounds(bbox, COUNTRY_VIEW_FACTOR) : null;
+    this.map.setMaxBounds(null);
+    this.map.setMinZoom(0);
     this.map.fitBounds(
       bounds,
       { padding: 40, animate: true, duration: 600 },
     );
+    if (!countryViewBounds) return;
+    const countryCamera = this.map.cameraForBounds(countryViewBounds, { padding: 0 });
+    if (typeof countryCamera.zoom === 'number') this.map.setMinZoom(countryCamera.zoom);
+    this.map.setMaxBounds(countryViewBounds);
   }
 
   /**

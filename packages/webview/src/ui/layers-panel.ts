@@ -29,6 +29,9 @@ export function mountLayersPanel(
   onPrimaryKey: (layerId: string, key: string | null) => void,
   onLocateFeature: (layerId: string, featureId: number) => void,
   onFeatureVisible: (layerId: string, featureId: number, visible: boolean) => void,
+  onFeaturesVisible: (layerId: string, featureIds: ReadonlyArray<number>, visible: boolean) => void,
+  onAddLayer: () => void,
+  onSaveProject: () => void,
 ): LayersPanel {
   const root = document.createElement('aside');
   root.className = 'mv-layers-panel';
@@ -49,15 +52,34 @@ export function mountLayersPanel(
   const country = document.createElement('select');
   country.className = 'mv-layers-panel__country';
   country.setAttribute('aria-label', 'Country scope');
+  const countryRow = document.createElement('div');
+  countryRow.className = 'mv-layers-panel__country-row';
+  const countryLabel = document.createElement('span');
+  countryLabel.className = 'mv-layers-panel__country-label';
+  countryLabel.textContent = 'Country View:';
+  countryRow.append(countryLabel, country);
   header.appendChild(title);
   header.appendChild(count);
   header.appendChild(groupBtn);
   root.appendChild(header);
-  root.appendChild(country);
+  root.appendChild(countryRow);
 
   const body = document.createElement('div');
   body.className = 'mv-layers-panel__body';
   root.appendChild(body);
+
+  const footer = document.createElement('div');
+  footer.className = 'mv-layers-panel__footer';
+  const addLayer = document.createElement('button');
+  addLayer.type = 'button';
+  addLayer.className = 'mv-layers-panel__footer-button';
+  addLayer.textContent = 'Add Layer';
+  const saveProject = document.createElement('button');
+  saveProject.type = 'button';
+  saveProject.className = 'mv-layers-panel__footer-button';
+  saveProject.textContent = 'Save Project';
+  footer.append(addLayer, saveProject);
+  root.appendChild(footer);
 
   container.appendChild(root);
 
@@ -77,6 +99,8 @@ export function mountLayersPanel(
   country.addEventListener('change', () => {
     onCountry(country.value === '' ? null : country.value);
   });
+  addLayer.addEventListener('click', onAddLayer);
+  saveProject.addEventListener('click', onSaveProject);
 
   let lastUpdate = initial;
 
@@ -145,6 +169,7 @@ export function mountLayersPanel(
           onPrimaryKey,
           onLocateFeature,
           onFeatureVisible,
+          onFeaturesVisible,
         );
         layerRows.set(layer.id, row);
       } else {

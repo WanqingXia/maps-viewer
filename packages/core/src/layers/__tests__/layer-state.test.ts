@@ -85,11 +85,11 @@ describe('reduce: setLayerColor / setLayerStrokeWidth / setLayerVisible', () => 
     expect(next.layers[0]!.color).toBe(GREEN);
   });
 
-  it('clamps stroke width to [0, 50]', () => {
+  it('clamps stroke width to [0, 30]', () => {
     const a = makeLayer({ id: 'A' });
     const s = reduce(EMPTY_LAYER_STATE, { type: 'addLayer', layer: a });
     expect(reduce(s, { type: 'setLayerStrokeWidth', layerId: 'A', width: -5 }).layers[0]!.strokeWidth).toBe(0);
-    expect(reduce(s, { type: 'setLayerStrokeWidth', layerId: 'A', width: 99 }).layers[0]!.strokeWidth).toBe(50);
+    expect(reduce(s, { type: 'setLayerStrokeWidth', layerId: 'A', width: 99 }).layers[0]!.strokeWidth).toBe(30);
     expect(reduce(s, { type: 'setLayerStrokeWidth', layerId: 'A', width: 7 }).layers[0]!.strokeWidth).toBe(7);
   });
 

@@ -21,12 +21,14 @@ export function mountLayerRow(
   onPrimaryKey: (layerId: string, key: string | null) => void,
   onLocateFeature: (layerId: string, featureId: number) => void,
   onFeatureVisible: (layerId: string, featureId: number, visible: boolean) => void,
+  onFeaturesVisible: (layerId: string, featureIds: ReadonlyArray<number>, visible: boolean) => void,
 ): LayerRow {
   let current = options.layer;
   let currentOptions = options;
   let expanded = false;
   let query = '';
   let sortAsc = true;
+  let recordsScrollTop = 0;
 
   const row = document.createElement('div');
   row.className = 'mv-layer-row';
@@ -50,7 +52,7 @@ export function mountLayerRow(
   name.title = current.displayName;
   name.setAttribute('aria-label', 'Layer name');
 
-  const delBtn = iconButton('mv-layer-row__delete', `Remove layer ${current.displayName}`, '×');
+  const delBtn = iconButton('mv-layer-row__delete', `Remove layer ${current.displayName}`, 'Remove');
 
   const stroke = mountStrokeSlider(current.strokeWidth, (width) =>
     onAction({ type: 'setLayerStrokeWidth', layerId: current.id, width }),
@@ -75,8 +77,9 @@ export function mountLayerRow(
   search.className = 'mv-layer-row__records-search';
   search.placeholder = 'Search records';
   search.setAttribute('aria-label', 'Search records');
+  const bulkVisibleBtn = iconButton('mv-layer-row__records-bulk-vis', 'Hide all matching records', eyeIcon(true));
   const sortBtn = iconButton('mv-layer-row__records-sort', 'Sort records', 'A→Z');
-  recordsToolbar.append(search, sortBtn);
+  recordsToolbar.append(bulkVisibleBtn, search, sortBtn);
 
   const recordsList = document.createElement('div');
   recordsList.className = 'mv-layer-row__records-list';
@@ -128,6 +131,15 @@ export function mountLayerRow(
   search.addEventListener('input', () => {
     query = search.value;
     renderRecords();
+  });
+  recordsList.addEventListener('scroll', () => {
+    recordsScrollTop = recordsList.scrollTop;
+  });
+  bulkVisibleBtn.addEventListener('click', () => {
+    const items = visibleRecordItems();
+    if (items.length === 0) return;
+    const allHidden = items.every((item) => currentOptions.hiddenFeatureIds.has(item.featureId));
+    onFeaturesVisible(current.id, items.map((item) => item.featureId), allHidden);
   });
   sortBtn.addEventListener('click', () => {
     sortAsc = !sortAsc;
@@ -181,30 +193,49 @@ export function mountLayerRow(
 
   function renderRecords(): void {
     const key = currentOptions.primaryKey;
-    const allItems = key ? currentOptions.meta?.featuresByKey[key] ?? [] : [];
-    const normalizedQuery = query.trim().toLowerCase();
-    const items = allItems
-      .filter((item) => normalizedQuery === '' || item.label.toLowerCase().includes(normalizedQuery))
-      .sort((a, b) => sortAsc ? a.label.localeCompare(b.label) : b.label.localeCompare(a.label));
+    const allItems = allRecordItems();
+    const items = visibleRecordItems();
+    const nextScrollTop = recordsScrollTop;
+    const allHidden = items.length > 0 && items.every((item) => currentOptions.hiddenFeatureIds.has(item.featureId));
 
     records.dataset.visible = String(expanded);
     expandBtn.textContent = expanded ? 'Records ▴' : 'Records ▾';
     expandBtn.disabled = allItems.length === 0;
     sortBtn.textContent = sortAsc ? 'A→Z' : 'Z→A';
+    bulkVisibleBtn.innerHTML = eyeIcon(allHidden);
+    bulkVisibleBtn.setAttribute('aria-label', allHidden ? 'Show all matching records' : 'Hide all matching records');
 
     if (!expanded) return;
     if (!key) {
       recordsList.innerHTML = '<div class="mv-layer-row__records-empty">Pick a primary key first.</div>';
+      recordsScrollTop = 0;
       return;
     }
     if (items.length === 0) {
       recordsList.innerHTML = '<div class="mv-layer-row__records-empty">No matching records.</div>';
+      recordsScrollTop = 0;
       return;
     }
     recordsList.innerHTML = '';
     for (const item of items) {
       recordsList.appendChild(recordRow(item));
     }
+    recordsList.scrollTop = nextScrollTop;
+    requestAnimationFrame(() => {
+      recordsList.scrollTop = nextScrollTop;
+    });
+  }
+
+  function allRecordItems(): ReadonlyArray<FeatureOption> {
+    const key = currentOptions.primaryKey;
+    return key ? currentOptions.meta?.featuresByKey[key] ?? [] : [];
+  }
+
+  function visibleRecordItems(): FeatureOption[] {
+    const normalizedQuery = query.trim().toLowerCase();
+    return [...allRecordItems()]
+      .filter((item) => normalizedQuery === '' || item.label.toLowerCase().includes(normalizedQuery))
+      .sort((a, b) => sortAsc ? a.label.localeCompare(b.label) : b.label.localeCompare(a.label));
   }
 
   function recordRow(item: FeatureOption): HTMLElement {
