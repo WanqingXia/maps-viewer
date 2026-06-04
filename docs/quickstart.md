@@ -29,11 +29,17 @@ Each new layer gets a distinct color from the 22-color palette.
 
 The LayersPanel sits on the left of the map panel:
 
-- **● dot** — toggle visibility
+- **Eye icon** — toggle layer visibility
 - **Color swatch** — opens the 22-swatch picker
 - **Layer name** — click and edit to rename
 - **Stroke slider** — drag 0–30 for line thickness
+- **Primary key selector** — choose the property used to list feature records
+- **Records** — expand searchable/sortable feature rows with view/hide and zoom controls
 - **✕** — remove the layer
+
+Use **New Group** to create a group, then drag profiles into or out of that group. Grouped profiles inherit the group color and visibility; if a group is deleted, its profiles return to standard layers.
+
+Use **Point Render** when zooming out. When enabled, lines and shapes that become too small to read at the current zoom collapse into fixed-size dots so their positions remain visible.
 
 ## 5. Save as a project
 
@@ -52,7 +58,7 @@ Once you've set a primary key per layer, you can find any record in seconds:
 
 You can also limit the map to one country:
 
-- **Maps Viewer: Set Country Scope…** → pick from 47 countries or "World" to clear.
+- Use the **Country View** selector in the side panel, or run **Maps Viewer: Set Country Scope…** → pick from curated countries or "World" to clear.
 
 ## 7. Sync projects across machines (optional)
 

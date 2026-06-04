@@ -15,6 +15,7 @@ export interface LayersPanelUpdate {
   readonly hiddenFeatureIds: ReadonlyMap<string, ReadonlySet<number | string>>;
   readonly countries: ReadonlyArray<CountryBbox>;
   readonly country: CountryCode | null;
+  readonly pointRenderEnabled: boolean;
 }
 
 /**
@@ -26,6 +27,7 @@ export function mountLayersPanel(
   initial: LayersPanelUpdate,
   onAction: (a: UserAction) => void,
   onCountry: (country: CountryCode | null) => void,
+  onPointRender: (enabled: boolean) => void,
   onPrimaryKey: (layerId: string, key: string | null) => void,
   onLocateFeature: (layerId: string, featureId: number) => void,
   onFeatureVisible: (layerId: string, featureId: number, visible: boolean) => void,
@@ -49,6 +51,12 @@ export function mountLayersPanel(
   groupBtn.className = 'mv-layers-panel__group';
   groupBtn.textContent = 'New Group';
   groupBtn.title = 'Create a new group';
+  const pointRenderBtn = document.createElement('button');
+  pointRenderBtn.type = 'button';
+  pointRenderBtn.className = 'mv-layers-panel__point-render';
+  pointRenderBtn.textContent = 'Point Render';
+  pointRenderBtn.title = 'Render small line and shape features as dots at low zoom';
+  pointRenderBtn.setAttribute('aria-pressed', 'false');
   const country = document.createElement('select');
   country.className = 'mv-layers-panel__country';
   country.setAttribute('aria-label', 'Country scope');
@@ -61,6 +69,7 @@ export function mountLayersPanel(
   header.appendChild(title);
   header.appendChild(count);
   header.appendChild(groupBtn);
+  header.appendChild(pointRenderBtn);
   root.appendChild(header);
   root.appendChild(countryRow);
 
@@ -99,6 +108,9 @@ export function mountLayersPanel(
   country.addEventListener('change', () => {
     onCountry(country.value === '' ? null : country.value);
   });
+  pointRenderBtn.addEventListener('click', () => {
+    onPointRender(!lastUpdate.pointRenderEnabled);
+  });
   addLayer.addEventListener('click', onAddLayer);
   saveProject.addEventListener('click', onSaveProject);
 
@@ -108,6 +120,8 @@ export function mountLayersPanel(
     lastUpdate = options;
     const { state } = options;
     count.textContent = `(${state.layers.length})`;
+    pointRenderBtn.dataset.active = String(options.pointRenderEnabled);
+    pointRenderBtn.setAttribute('aria-pressed', String(options.pointRenderEnabled));
     renderCountries(options);
 
     const layersByGroup = new Map<string | null, Layer[]>();

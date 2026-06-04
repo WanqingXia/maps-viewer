@@ -17,29 +17,35 @@ export function wireHover(
 ): () => void {
   const sublayers = sublayerIds(layerId);
   let lastFeatureId: number | string | null = null;
+  let lastSource = layerId;
 
-  const setHover = (featureId: number | string, on: boolean): void => {
-    map.setFeatureState({ source: layerId, id: featureId }, { hover: on });
+  const setHover = (source: string, featureId: number | string, on: boolean): void => {
+    map.setFeatureState({ source, id: featureId }, { hover: on });
   };
 
   const clearHover = (): void => {
     if (lastFeatureId !== null) {
-      setHover(lastFeatureId, false);
+      setHover(lastSource, lastFeatureId, false);
       lastFeatureId = null;
+      lastSource = layerId;
     }
     popup.hide();
   };
 
   const handleMove = (e: unknown): void => {
     const event = e as {
-      features?: ReadonlyArray<{ id?: number | string; properties?: Record<string, unknown> | null }>;
+      features?: ReadonlyArray<{ id?: number | string; source?: string; properties?: Record<string, unknown> | null }>;
       point?: { x: number; y: number };
     };
     const feature = event.features?.[0];
     if (!feature || feature.id == null) return;
-    if (lastFeatureId !== null && lastFeatureId !== feature.id) setHover(lastFeatureId, false);
+    const source = feature.source ?? layerId;
+    if (lastFeatureId !== null && (lastFeatureId !== feature.id || lastSource !== source)) {
+      setHover(lastSource, lastFeatureId, false);
+    }
     lastFeatureId = feature.id;
-    setHover(feature.id, true);
+    lastSource = source;
+    setHover(source, feature.id, true);
     if (event.point) popup.show(event.point.x, event.point.y, getLayerName(), feature.properties ?? null);
   };
 

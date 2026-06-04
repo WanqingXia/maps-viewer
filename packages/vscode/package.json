@@ -1,22 +1,26 @@
 {
   "name": "maps-viewer",
   "displayName": "Maps Viewer",
-  "description": "View multiple GeoJSON files together on a Mapbox map — with grouping, color palette, hover popups, country scoping, primary-key Locate, and saved projects. Directly in VS Code.",
+  "description": "View, compare, group, scope, and inspect GeoJSON layers on an interactive Mapbox map directly inside VS Code.",
   "version": "0.1.0",
-  "publisher": "PLACEHOLDER",
-  "private": true,
+  "publisher": "WanqingXia",
+  "private": false,
   "license": "MIT",
   "icon": "resources/icon.png",
   "categories": ["Visualization", "Other"],
-  "keywords": ["geojson", "map", "mapbox", "gis", "geo", "viewer", "spatial"],
+  "keywords": ["geojson", "map", "mapbox", "gis", "geo", "viewer", "spatial", "layers", "primary-key", "country", "point-render"],
   "repository": {
     "type": "git",
-    "url": "https://github.com/PLACEHOLDER/maps-viewer.git"
+    "url": "https://github.com/WanqingXia/maps-viewer.git"
   },
   "bugs": {
-    "url": "https://github.com/PLACEHOLDER/maps-viewer/issues"
+    "url": "https://github.com/WanqingXia/maps-viewer/issues"
   },
-  "homepage": "https://github.com/PLACEHOLDER/maps-viewer#readme",
+  "homepage": "https://github.com/WanqingXia/maps-viewer#readme",
+  "galleryBanner": {
+    "color": "#1f242c",
+    "theme": "dark"
+  },
   "qna": "marketplace",
   "engines": {
     "vscode": "^1.85.0"

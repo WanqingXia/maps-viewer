@@ -1,10 +1,10 @@
 # Maps Viewer
 
-> A VS Code extension that visualizes one or many GeoJSON files on an interactive Mapbox map — without ever leaving your IDE.
+> A VS Code extension that visualizes, compares, groups, scopes, and inspects one or many GeoJSON files on an interactive Mapbox map — without ever leaving your IDE.
 
-Right-click any `.geojson` file → **View in Maps** → see it on a real map with hover popups, color-coded layers, group cascades, country scoping, primary-key Locate, and saved Map Projects.
+Right-click any `.geojson` file → **View in Maps** → see it on a real map with hover popups, grouped layers, country view, primary-key records, feature zoom, optional point rendering, and saved Map Projects.
 
-![Maps Viewer hero](docs/screenshots/hero.png)
+![Maps Viewer logo](logo.png)
 
 > **Status**: v0.1.0 (alpha — first public release candidate). Built across 5 phases from spec to ship; see `.claude/PRPs/` for the full PRD, plans, and per-phase implementation reports.
 
@@ -13,14 +13,16 @@ Right-click any `.geojson` file → **View in Maps** → see it on a real map wi
 ## Features
 
 - **Right-click GeoJSON → View in Maps** — instant in-IDE map, no upload to external tools
-- **Multi-file comparison** — load several files into one map, group them, share colors
+- **Multi-file comparison** — load several files into one map, group them, share colors and visibility
+- **Groups** — create groups, drag profiles in/out, apply shared group color, and restore profiles when groups are deleted
 - **22-color palette** — auto-cycles per layer; pick any swatch with one click
 - **Hover-to-highlight + properties popup** — every feature reveals its full attribute set
 - **Standard / Satellite basemap toggle** — top-right of the map
 - **Maps Manager sidebar** — save your current map as a named project; reopen it later with identical layers + camera
-- **Locate by primary key** — set a PK column once, then Cmd+Shift+P → type any value → fly to the feature
-- **Country scoping** — pick from 47 curated countries to limit the view
-- **Small-feature-as-dot** — sub-100m features render as 4px circles at low zoom so nothing disappears
+- **Primary key records** — select a property per layer, search/sort records, hide/show individual records, and zoom to a single feature
+- **Zoom onto features** — fly directly to a selected geometry from records or the command palette
+- **Country View** — pick from curated countries to fit and constrain the map to that region
+- **Point Render** — optionally collapse lines/shapes into fixed-size dots only when they become too small at the current zoom
 - **Adjustable stroke width** — 0–30 per layer, live preview as you drag
 - **BYO Mapbox token** — your token stays on your machine via VS Code's SecretStorage; never shared
 
@@ -35,7 +37,7 @@ Right-click any `.geojson` file → **View in Maps** → see it on a real map wi
 5. The map opens in a panel beside the editor
 ```
 
-See [docs/quickstart.md](docs/quickstart.md) for the full walkthrough including multi-file load, grouping, and saving projects.
+See [docs/quickstart.md](docs/quickstart.md) for the full walkthrough including multi-file load, grouping, country view, primary-key records, point rendering, and saving projects.
 
 ## Maps Manager
 
@@ -75,7 +77,6 @@ Maps Viewer **does not collect telemetry**. Your Mapbox token is stored locally 
 
 - **50 MB hard cap** on a single `.geojson` file (read into memory; large datasets show a parse error)
 - **Concurrent edits** to `maps.json` from multiple VS Code windows are last-writer-wins
-- **No grouping UI yet** in the sidebar — the data model supports groups (Phase 2) but a "Group selected layers" button is on the polish list
 - **47 curated country bboxes** — easy to add more via a PR to `packages/core/src/bbox/country-bboxes.json`
 - **Dev mode F5** vs **VSIX install** — they're identical at runtime; sibling-package URIs are bundled into the VSIX's `dist/webview/` at build time
 - **macOS users**: VS Code's F5 may collide with macOS Dictation. Use `Cmd+Shift+P → Debug: Start Debugging` instead
@@ -83,7 +84,7 @@ Maps Viewer **does not collect telemetry**. Your Mapbox token is stored locally 
 ## Dev setup (for contributing)
 
 ```bash
-git clone https://github.com/PLACEHOLDER/maps-viewer.git
+git clone https://github.com/WanqingXia/maps-viewer.git
 cd maps-viewer
 pnpm install
 pnpm build
@@ -94,7 +95,7 @@ pnpm build
 Tests:
 
 ```bash
-pnpm test          # 73 tests across 11 files
+pnpm test          # 77 tests across 11 files
 pnpm typecheck     # 4 packages, strict
 ```
 

@@ -54,6 +54,7 @@ let primaryKeyByLayer: PrimaryKeyMap = {};
 let layerFeatureMeta: LayerFeatureMetaMap = {};
 let countries: ReadonlyArray<CountryBbox> = [];
 let currentCountry: CountryCode | null = null;
+let pointRenderEnabled = false;
 const hiddenFeatureIds = new Map<string, Set<number | string>>();
 
 function ensureMapContainer(): HTMLElement {
@@ -176,6 +177,11 @@ async function handleInit(msg: Extract<HostMessage, { type: 'init' }>): Promise<
       currentCountry = country;
       send({ type: 'setCountry', country });
       handleSetCountry(country);
+      updatePanel();
+    },
+    (enabled) => {
+      pointRenderEnabled = enabled;
+      map?.setPointRender(enabled);
       updatePanel();
     },
     (layerId, key) => {
@@ -319,6 +325,7 @@ function panelUpdate(): LayersPanelUpdate {
     hiddenFeatureIds,
     countries,
     country: currentCountry,
+    pointRenderEnabled,
   };
 }
 

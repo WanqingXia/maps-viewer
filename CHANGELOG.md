@@ -24,7 +24,7 @@ First public-release candidate. Built across 5 phases.
 - LayersPanel sidebar with per-layer view/hide, rename, delete
 - Color picker dropdown (22 swatches)
 - Stroke width slider 0–30 with live preview
-- Layer grouping data model (createGroup / setGroupColor cascade / deleteGroup)
+- Layer grouping UI and data model (createGroup / setGroupColor cascade / deleteGroup)
 - Quick-pick when adding a 2nd file: "Add to current map" vs "Open in new map"
 - `Maps Viewer: Add File to Current Map…` palette command
 
@@ -40,7 +40,7 @@ First public-release candidate. Built across 5 phases.
 - `Maps Viewer: Set Primary Key…` — two-step quick-pick (layer → property)
 - `Maps Viewer: Locate Feature…` — flat quick-pick of PK values; map flies + brief yellow pulse
 - `Maps Viewer: Set Country Scope…` — 47 curated countries + World
-- Small-feature-as-dot rendering (features <100m at zoom <13 render as 4px circles)
+- Optional **Point Render** mode that collapses visually tiny line/polygon features into fixed-size dots based on current zoom
 
 #### Polish + Publish (Phase 5)
 - Marketplace icon (256×256 PNG, rendered from SVG)
@@ -58,10 +58,9 @@ No telemetry. Mapbox token stored locally in `SecretStorage`. GeoJSON content ne
 
 - 50 MB hard cap on a single GeoJSON file
 - Last-writer-wins on `maps.json` across multiple VS Code windows
-- No "Group selected layers" UI button yet (data model supports it)
 - 47 curated country bboxes (extend via `packages/core/src/bbox/country-bboxes.json`)
 
 ### Test surface
 
-- 73 unit tests across 11 files (`@maps-viewer/core` + `@maps-viewer/shared`)
+- 77 unit tests across 11 files (`@maps-viewer/core` + `@maps-viewer/shared`)
 - Manual smoke test for webview interactions (no automated browser tests yet)

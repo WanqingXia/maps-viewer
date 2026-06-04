@@ -3,7 +3,8 @@ import type { Feature, Geometry, Position } from 'geojson';
 /**
  * Approximate "size" of a feature in meters.
  *
- * Used by the dot-rendering filter (`SMALL_FEATURE_M`). Definitions:
+ * Used by Point Render to estimate when a feature's projected footprint
+ * becomes too small to read. Definitions:
  *   - Point / MultiPoint        → 0 (already point-shaped; never collapsed to dot)
  *   - LineString / MultiLine    → total line length (meters)
  *   - Polygon / MultiPolygon    → max(bbox width, bbox height) in meters

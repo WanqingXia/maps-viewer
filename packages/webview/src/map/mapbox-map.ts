@@ -8,7 +8,17 @@ import type {
   CountryCode,
 } from '@maps-viewer/shared';
 import type { FeatureCollection } from 'geojson';
-import { renderLayer, sublayerIds, hoverCase, iterateCoordinates, sublayerFilter, sublayerKindFromId } from './render-layer.js';
+import {
+  renderLayer,
+  sublayerIds,
+  hoverCase,
+  iterateCoordinates,
+  sublayerFilter,
+  sublayerKindFromId,
+  dotSourceId,
+  layerIdFromDotSource,
+  collapseZoomOf,
+} from './render-layer.js';
 import { wireHover } from './hover.js';
 import { mountBasemapToggle, type BasemapToggle } from '../ui/basemap-toggle.js';
 import { mountPropertiesPopup, type PropertiesPopup } from '../ui/properties-popup.js';
@@ -33,7 +43,9 @@ export class MapboxMap {
   private readonly details: FeatureDetails;
   private readonly toggle: BasemapToggle;
   private readonly hiddenFeatureIds = new Map<string, Set<number | string>>();
+  private readonly collapsedFeatureIds = new Map<string, Set<number | string>>();
   private selectedFeature: { layerId: string; featureId: number | string } | null = null;
+  private pointRenderEnabled = false;
 
   constructor(
     container: HTMLElement,
@@ -61,6 +73,7 @@ export class MapboxMap {
       this.send({ type: 'error', message: `mapbox: ${detail}`, code: 'MAPBOX_ERROR' });
     });
     this.map.on('click', (event: unknown) => this.handleMapClick(event));
+    this.map.on('zoom', () => this.updateCollapsedFeatureIds());
   }
 
   whenReady(fn: () => void): void {
@@ -80,7 +93,7 @@ export class MapboxMap {
         if (!data) return;
         this.layers.set(action.layer.id, action.layer);
         this.layerData.set(action.layer.id, data);
-        renderLayer(this.map, action.layer, data);
+        renderLayer(this.map, action.layer, data, this.pointRenderEnabled);
         const layerId = action.layer.id;
         const disposer = wireHover(
           this.map,
@@ -89,6 +102,7 @@ export class MapboxMap {
           () => this.layers.get(layerId)?.displayName ?? action.layer.fileName,
         );
         this.hoverDisposers.set(layerId, disposer);
+        this.updateCollapsedFeatureIds();
         this.fitToLayers();
         return;
       }
@@ -99,8 +113,10 @@ export class MapboxMap {
           if (this.map.getLayer(id)) this.map.removeLayer(id);
         }
         if (this.map.getSource(action.layerId)) this.map.removeSource(action.layerId);
+        if (this.map.getSource(dotSourceId(action.layerId))) this.map.removeSource(dotSourceId(action.layerId));
         this.layers.delete(action.layerId);
         this.layerData.delete(action.layerId);
+        this.collapsedFeatureIds.delete(action.layerId);
         return;
       }
       case 'setLayerColor': {
@@ -202,7 +218,7 @@ export class MapboxMap {
       for (const [layerId, layer] of this.layers) {
         const data = this.layerData.get(layerId);
         if (!data) continue;
-        renderLayer(this.map, layer, data);
+        renderLayer(this.map, layer, data, this.pointRenderEnabled);
         const id = layerId;
         const disposer = wireHover(
           this.map,
@@ -212,6 +228,7 @@ export class MapboxMap {
         );
         this.hoverDisposers.set(id, disposer);
       }
+      this.updateCollapsedFeatureIds();
     });
   }
 
@@ -310,6 +327,17 @@ export class MapboxMap {
     }
   }
 
+  setPointRender(enabled: boolean): void {
+    this.pointRenderEnabled = enabled;
+    this.updateCollapsedFeatureIds();
+    for (const [layerId, layer] of this.layers) {
+      const dot = `${layerId}-dot`;
+      if (this.map.getLayer(dot)) {
+        this.map.setLayoutProperty(dot, 'visibility', this.dotVisibility(layer));
+      }
+    }
+  }
+
   private repaintColor(layerId: string, color: Layer['color']): void {
     const fill = `${layerId}-fill`;
     const line = `${layerId}-line`;
@@ -330,19 +358,47 @@ export class MapboxMap {
   }
 
   private repaintVisible(layerId: string, visible: boolean): void {
+    const layer = this.layers.get(layerId);
     const value = visible ? 'visible' : 'none';
     for (const id of sublayerIds(layerId)) {
-      if (this.map.getLayer(id)) this.map.setLayoutProperty(id, 'visibility', value);
+      if (!this.map.getLayer(id)) continue;
+      const isDot = id === `${layerId}-dot`;
+      this.map.setLayoutProperty(id, 'visibility', isDot && layer ? this.dotVisibility(layer) : value);
     }
+  }
+
+  private dotVisibility(layer: Layer): 'visible' | 'none' {
+    return layer.visible && this.pointRenderEnabled ? 'visible' : 'none';
   }
 
   private repaintFeatureFilters(layerId: string): void {
     const hidden = this.hiddenFeatureIds.get(layerId) ?? new Set<number | string>();
+    const collapsed = this.collapsedFeatureIds.get(layerId) ?? new Set<number | string>();
     for (const sublayerId of sublayerIds(layerId)) {
       const kind = sublayerKindFromId(layerId, sublayerId);
       if (kind && this.map.getLayer(sublayerId)) {
-        this.map.setFilter(sublayerId, sublayerFilter(layerId, kind, hidden));
+        this.map.setFilter(sublayerId, sublayerFilter(layerId, kind, hidden, collapsed));
       }
+    }
+  }
+
+  private updateCollapsedFeatureIds(): void {
+    if (!this.pointRenderEnabled) {
+      if (this.collapsedFeatureIds.size === 0) return;
+      this.collapsedFeatureIds.clear();
+      for (const layerId of this.layers.keys()) this.repaintFeatureFilters(layerId);
+      return;
+    }
+    const zoom = getZoom(this.map);
+    for (const [layerId, data] of this.layerData) {
+      const collapsed = new Set<number | string>();
+      for (let i = 0; i < data.features.length; i++) {
+        const collapseZoom = collapseZoomOf(data.features[i]!);
+        if (collapseZoom !== null && zoom < collapseZoom) collapsed.add(i);
+      }
+      if (collapsed.size === 0) this.collapsedFeatureIds.delete(layerId);
+      else this.collapsedFeatureIds.set(layerId, collapsed);
+      this.repaintFeatureFilters(layerId);
     }
   }
 
@@ -357,7 +413,7 @@ export class MapboxMap {
       this.details.hide();
       return;
     }
-    const layerId = feature.source;
+    const layerId = this.layerIdForFeatureSource(feature.source);
     const layer = this.layers.get(layerId);
     if (!layer) return;
     this.selectedFeature = { layerId, featureId: feature.id };
@@ -366,6 +422,10 @@ export class MapboxMap {
       featureId: feature.id,
       properties: feature.properties,
     });
+  }
+
+  private layerIdForFeatureSource(source: string): string {
+    return this.layers.has(source) ? source : layerIdFromDotSource(source) ?? source;
   }
 
   private zoomToSelectedFeature(): void {

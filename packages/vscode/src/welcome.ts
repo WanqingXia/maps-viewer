@@ -31,15 +31,14 @@ export async function maybeShowWelcome(context: vscode.ExtensionContext): Promis
 
 /**
  * Best-effort link to the quickstart docs. Falls back to the extension's
- * homepage from package.json, then to a generic placeholder. (The repo
- * URL has `PLACEHOLDER` until the user replaces it before publishing.)
+ * homepage from package.json, then to the public repository.
  */
 function pickHomepageUrl(context: vscode.ExtensionContext): string {
   const pkg = context.extension.packageJSON as {
     homepage?: string;
     repository?: { url?: string };
   };
-  if (pkg.homepage && !pkg.homepage.includes('PLACEHOLDER')) return pkg.homepage;
-  if (pkg.repository?.url && !pkg.repository.url.includes('PLACEHOLDER')) return pkg.repository.url;
-  return 'https://github.com/PLACEHOLDER/maps-viewer#quickstart';
+  if (pkg.homepage) return pkg.homepage;
+  if (pkg.repository?.url) return pkg.repository.url;
+  return 'https://github.com/WanqingXia/maps-viewer#readme';
 }

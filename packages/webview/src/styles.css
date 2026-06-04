@@ -76,7 +76,6 @@ body[data-resizing-panel='true'] {
   margin-right: auto;
 }
 
-.mv-layers-panel__group,
 .mv-layers-panel__country {
   appearance: none;
   border: 1px solid var(--vscode-dropdown-border, rgba(255, 255, 255, 0.14));
@@ -84,18 +83,6 @@ body[data-resizing-panel='true'] {
   color: var(--vscode-dropdown-foreground, #f1f1f1);
   border-radius: 4px;
   font: inherit;
-}
-
-.mv-layers-panel__group {
-  width: 88px;
-  height: 26px;
-  padding: 4px 8px;
-  cursor: pointer;
-}
-
-.mv-layers-panel__group:disabled {
-  cursor: default;
-  opacity: 0.45;
 }
 
 .mv-layers-panel__country {
@@ -140,6 +127,39 @@ body[data-resizing-panel='true'] {
   font: inherit;
   height: 28px;
   cursor: pointer;
+}
+
+.mv-layers-panel__group,
+.mv-layers-panel__point-render {
+  appearance: none;
+  border: 1px solid var(--vscode-button-border, transparent);
+  background: var(--vscode-button-secondaryBackground, rgba(255, 255, 255, 0.08));
+  color: var(--vscode-button-secondaryForeground, #f1f1f1);
+  border-radius: 4px;
+  font: inherit;
+  height: 26px;
+  padding: 4px 8px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.mv-layers-panel__group {
+  width: 88px;
+}
+
+.mv-layers-panel__point-render {
+  width: 96px;
+}
+
+.mv-layers-panel__point-render[data-active='true'] {
+  background: #d0d0d0;
+  color: #1f1f1f;
+}
+
+.mv-layers-panel__group:disabled,
+.mv-layers-panel__point-render:disabled {
+  cursor: default;
+  opacity: 0.45;
 }
 
 .mv-layers-panel__ungrouped-label {
