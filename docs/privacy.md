@@ -4,16 +4,16 @@
 
 ## What's stored locally
 
-- **Your Mapbox token** — saved via VS Code's `SecretStorage` API (encrypted by the host OS keychain). Never written to disk in plaintext, never sent off-machine.
+- **Optional custom Mapbox token** — if you override the bundled token, your token is saved via VS Code's `SecretStorage` API (encrypted by the host OS keychain). It is never written to disk in plaintext.
 - **Your saved Map Projects** (`maps.json`) — written to VS Code's per-extension global storage path, or to a custom path you set via `mapsViewer.mapsLocation`. Plain JSON; you can edit it directly if you want.
 
 ## What's sent over the network
 
 When a map is open, the webview makes HTTPS requests to:
 
-- `https://*.mapbox.com` — for map tiles, styles, and fonts (authenticated with your token)
+- `https://*.mapbox.com` — for map tiles, styles, and fonts (authenticated with the bundled token, or your custom token if configured)
 - `https://api.mapbox.com` — same purpose, different subdomain
-- `https://events.mapbox.com` — Mapbox's own usage telemetry. **This goes to Mapbox, not to us.** It's a side effect of using their SDK. The Mapbox token you provided is what authorizes those requests.
+- `https://events.mapbox.com` — Mapbox's own usage telemetry. **This goes to Mapbox, not to us.** It's a side effect of using their SDK.
 
 ## What's never sent
 
@@ -23,7 +23,7 @@ When a map is open, the webview makes HTTPS requests to:
 
 ## Mapbox terms
 
-You're using Maps Viewer with **your own** Mapbox token. The map tiles + styles are subject to [Mapbox's TOS](https://www.mapbox.com/legal/tos) and their pricing tier. The free tier (50,000 map loads/month) is generally enough for casual development; check your Mapbox dashboard if you have heavy use.
+Maps Viewer includes a Mapbox public token for the default basemap. The map tiles and styles are subject to [Mapbox's TOS](https://www.mapbox.com/legal/tos). If you configure your own token, usage may count against your Mapbox account.
 
 ## No analytics SDKs
 
@@ -31,4 +31,4 @@ This extension does not link any third-party analytics, error reporting, or usag
 
 ## Source
 
-The extension's source is open and auditable. See the `packages/` directory; the only HTTP traffic the host-side code makes is via `vscode.env.openExternal` (when you click "Get free token") and the Mapbox SDK requests above.
+The extension's source is open and auditable. See the `packages/` directory; the only HTTP traffic the host-side code makes is via `vscode.env.openExternal` when setting a custom token and the Mapbox SDK requests above.

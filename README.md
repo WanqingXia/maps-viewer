@@ -6,7 +6,7 @@ Right-click any `.geojson` file → **View in Maps** → see it on a real map wi
 
 ![Maps Viewer logo](logo.png)
 
-> **Status**: v0.1.0 (alpha — first public release candidate). Built across 5 phases from spec to ship; see `.claude/PRPs/` for the full PRD, plans, and per-phase implementation reports.
+> **Status**: v0.1.1 (alpha — first public release candidate). Built across 5 phases from spec to ship; see `.claude/PRPs/` for the full PRD, plans, and per-phase implementation reports.
 
 ---
 
@@ -24,7 +24,7 @@ Right-click any `.geojson` file → **View in Maps** → see it on a real map wi
 - **Country View** — pick from curated countries to fit and constrain the map to that region
 - **Point Render** — optionally collapse lines/shapes into fixed-size dots only when they become too small at the current zoom
 - **Adjustable stroke width** — 0–30 per layer, live preview as you drag
-- **BYO Mapbox token** — your token stays on your machine via VS Code's SecretStorage; never shared
+- **Bundled Mapbox access** — opens maps immediately with the extension's public token; advanced users can override it with their own token
 
 ## Quickstart
 
@@ -32,9 +32,7 @@ Right-click any `.geojson` file → **View in Maps** → see it on a real map wi
 1. Install the extension
 2. Open a folder containing one or more `.geojson` files
 3. Right-click a .geojson → "View in Maps"
-4. First time only: paste a Mapbox public token (pk.…)
-   Get one free at https://account.mapbox.com/access-tokens/
-5. The map opens in a panel beside the editor
+4. The map opens in a panel beside the editor
 ```
 
 See [docs/quickstart.md](docs/quickstart.md) for the full walkthrough including multi-file load, grouping, country view, primary-key records, point rendering, and saving projects.
@@ -60,7 +58,7 @@ By default, projects are stored in VS Code's per-extension global storage. Set `
 | `Maps Viewer: Locate Feature…` | Flat quick-pick of every PK value; jumps + pulses the feature |
 | `Maps Viewer: Set Country Scope…` | Country quick-pick; map auto-fits |
 | `Maps Viewer: Save as Project…` | Persist the current map as a named project |
-| `Maps Viewer: Set Mapbox Token…` | Re-enter / rotate your Mapbox token |
+| `Maps Viewer: Set Mapbox Token…` | Override the bundled token with your own Mapbox public token |
 
 ## Settings
 
@@ -71,7 +69,7 @@ By default, projects are stored in VS Code's per-extension global storage. Set `
 
 ## Privacy
 
-Maps Viewer **does not collect telemetry**. Your Mapbox token is stored locally via VS Code's `SecretStorage` and never sent anywhere except `*.mapbox.com` for tile and style requests. Your GeoJSON files never leave your machine. See [docs/privacy.md](docs/privacy.md) for the full statement.
+Maps Viewer **does not collect telemetry**. The extension includes a Mapbox public token for basemap requests; if you override it, your token is stored locally via VS Code's `SecretStorage`. Your GeoJSON files never leave your machine. See [docs/privacy.md](docs/privacy.md) for the full statement.
 
 ## Known limitations
 
@@ -104,7 +102,7 @@ Package + install locally:
 ```bash
 pnpm build
 pnpm --filter maps-viewer run package
-code --install-extension packages/vscode/maps-viewer-0.1.0.vsix --force
+code --install-extension packages/vscode/maps-viewer-0.1.1.vsix --force
 ```
 
 See `.claude/PRPs/` for:

@@ -6,15 +6,14 @@ This walks through opening a single file, then loading multiple files, then savi
 
 1. Install the **Maps Viewer** extension.
 2. Open VS Code on any folder containing one or more `.geojson` files (or paste one in).
-3. Get a free Mapbox **public** token from https://account.mapbox.com/access-tokens/ (the token starts with `pk.`).
+3. Maps Viewer includes a bundled Mapbox public token, so no token setup is required for normal use.
 
 ## 2. Open a single file
 
 1. Right-click any `.geojson` in the Explorer → **View in Maps**.
-2. First time only: a prompt asks for your Mapbox token. Paste it and press Enter.
-3. The map opens in a panel beside the editor. Hover a feature to see its properties.
+2. The map opens in a panel beside the editor. Hover a feature to see its properties.
 
-The token is stored in VS Code's encrypted `SecretStorage`. You won't be prompted again on this machine. Run **Maps Viewer: Set Mapbox Token…** to rotate or clear it.
+Run **Maps Viewer: Set Mapbox Token…** only if you want to override the bundled token with your own Mapbox public token. User-provided tokens are stored in VS Code's encrypted `SecretStorage`.
 
 ## 3. Add more files (multi-file comparison)
 
@@ -73,6 +72,6 @@ By default `maps.json` lives in VS Code's per-machine global storage. To sync vi
 | Symptom | Fix |
 |---|---|
 | Map is blank, devtools shows a Worker error | Reload window (Cmd+Shift+P → "Developer: Reload Window") |
-| "Mapbox token required" repeats every time | Token failed `SecretStorage` write. Try `Set Mapbox Token…` again. |
+| "Mapbox token required" appears | The bundled token was unavailable in this build. Run `Set Mapbox Token…` and paste a Mapbox public token. |
 | Right-click menu has no "View in Maps" | File doesn't have `.geojson` extension — VS Code menus filter on extension |
 | F5 doesn't launch in dev mode (macOS) | F5 is Dictation. Use Cmd+Shift+P → "Debug: Start Debugging" |

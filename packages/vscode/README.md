@@ -21,11 +21,11 @@ Maps Viewer turns VS Code into a practical GeoJSON inspection workspace. Open on
 
 ## First-Time Setup
 
-Maps Viewer uses Mapbox GL JS for the basemap. On first use, paste a Mapbox public token when prompted. The token is stored locally in VS Code SecretStorage and is only used for Mapbox tile/style requests.
+Maps Viewer uses Mapbox GL JS for the basemap and includes a public token for normal use. No token setup is required. Run **Maps Viewer: Set Mapbox Token...** only if you want to override the bundled token with your own Mapbox public token.
 
 ## Privacy
 
-Maps Viewer does not collect telemetry. Your GeoJSON files stay on your machine. Your Mapbox token is stored locally by VS Code and is not sent anywhere except Mapbox.
+Maps Viewer does not collect telemetry. Your GeoJSON files stay on your machine. The bundled Mapbox token, or your custom token if configured, is used only for Mapbox tile/style requests.
 
 ## Commands
 
@@ -37,12 +37,11 @@ Maps Viewer does not collect telemetry. Your GeoJSON files stay on your machine.
 | `Maps Viewer: Locate Feature...` | Jump to a feature by primary-key value |
 | `Maps Viewer: Set Country Scope...` | Choose a country view or return to world view |
 | `Maps Viewer: Save as Project...` | Save the current map as a reusable project |
-| `Maps Viewer: Set Mapbox Token...` | Add or rotate your Mapbox public token |
+| `Maps Viewer: Set Mapbox Token...` | Override the bundled token with your own Mapbox public token |
 
 ## Requirements
 
 - VS Code 1.85 or newer
-- A Mapbox public token beginning with `pk.`
 - One or more `.geojson` files
 
 ## Links

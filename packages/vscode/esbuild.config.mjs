@@ -1,9 +1,10 @@
 import { build, context } from 'esbuild';
-import { cp, mkdir, stat } from 'node:fs/promises';
+import { cp, mkdir, readFile, stat } from 'node:fs/promises';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const here = dirname(fileURLToPath(import.meta.url));
+const repoRoot = resolve(here, '../..');
 const webviewDist = resolve(here, '../webview/dist');
 const webviewVendor = resolve(here, '../webview/vendor');
 const bundleTarget = resolve(here, 'dist/webview');
@@ -55,6 +56,25 @@ async function copyWebviewAssets() {
   }
 }
 
+async function readBundledMapboxToken() {
+  try {
+    const envText = await readFile(resolve(repoRoot, '.env'), 'utf8');
+    for (const rawLine of envText.split(/\r?\n/)) {
+      const line = rawLine.trim();
+      if (!line || line.startsWith('#')) continue;
+      const eq = line.indexOf('=');
+      if (eq < 0) continue;
+      const key = line.slice(0, eq).trim();
+      if (key !== 'MAPBOX_TOKEN') continue;
+      const rawValue = line.slice(eq + 1).trim();
+      return rawValue.replace(/^['"]|['"]$/g, '');
+    }
+  } catch {
+    // A missing .env is allowed for contributors; the extension will prompt.
+  }
+  return '';
+}
+
 /** Esbuild plugin: copy webview assets after each (re)build. */
 const copyWebviewPlugin = {
   name: 'copy-webview-assets',
@@ -70,6 +90,8 @@ const copyWebviewPlugin = {
   },
 };
 
+const bundledMapboxToken = await readBundledMapboxToken();
+
 const options = {
   entryPoints: ['src/extension.ts'],
   outfile: 'dist/extension.cjs',
@@ -79,6 +101,9 @@ const options = {
   target: 'node18',
   external: ['vscode'],
   sourcemap: true,
+  define: {
+    'process.env.MAPBOX_TOKEN': JSON.stringify(bundledMapboxToken),
+  },
   logLevel: 'info',
   plugins: [copyWebviewPlugin],
 };

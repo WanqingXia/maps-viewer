@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { ensureToken } from '../token/prompt-for-token.js';
+import { promptAndStoreToken } from '../token/prompt-for-token.js';
 import type { TokenManager } from '../token/token-manager.js';
 import type { Logger } from '../util/logger.js';
 
@@ -7,7 +7,7 @@ import type { Logger } from '../util/logger.js';
 export async function setMapboxToken(tm: TokenManager, logger: Logger): Promise<void> {
   try {
     await tm.clear();
-    await ensureToken(tm);
+    await promptAndStoreToken(tm);
     void vscode.window.showInformationMessage('Maps Viewer: Mapbox token updated.');
   } catch (err) {
     logger.error('setMapboxToken failed', err);
