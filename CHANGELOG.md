@@ -42,6 +42,9 @@ First public-release candidate. Built across 5 phases.
 - `Maps Viewer: Set Country Scope…` — 47 curated countries + World
 - Optional **Point Render** mode that collapses visually tiny line/polygon features into fixed-size dots based on current zoom
 - Feature coordinate inspection, right-click point locating, OSM/GraphHopper open links, and OSM point query
+- Editor-to-map zoom: click inside a `.geojson` feature record to zoom the open map to that feature
+- Right-click locate points now clear when the user left-clicks the map
+- Adding a GeoJSON to an existing map now prefers unused auto-palette colors before repeating
 
 #### Polish + Publish (Phase 5)
 - Marketplace icon (256×256 PNG, rendered from SVG)

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { AUTO_PALETTE } from '@maps-viewer/shared';
-import { assignColor } from '../assign-color.js';
+import { assignColor, assignUnusedColor } from '../assign-color.js';
 
 describe('assignColor', () => {
   it('returns the first auto-palette entry for usedCount 0', () => {
@@ -28,5 +28,19 @@ describe('assignColor', () => {
   it('handles negative input safely (treated as positive cycle)', () => {
     expect(assignColor(-1)).toBe(AUTO_PALETTE[AUTO_PALETTE.length - 1]);
     expect(assignColor(-20)).toBe(AUTO_PALETTE[0]);
+  });
+});
+
+describe('assignUnusedColor', () => {
+  it('returns the first unused auto-palette color', () => {
+    expect(assignUnusedColor([AUTO_PALETTE[0]!, AUTO_PALETTE[1]!], 2)).toBe(AUTO_PALETTE[2]);
+  });
+
+  it('compares used colors case-insensitively', () => {
+    expect(assignUnusedColor([AUTO_PALETTE[0]!.toUpperCase()], 1)).toBe(AUTO_PALETTE[1]);
+  });
+
+  it('falls back to the normal cycle when all auto colors are used', () => {
+    expect(assignUnusedColor(AUTO_PALETTE, 21)).toBe(AUTO_PALETTE[1]);
   });
 });

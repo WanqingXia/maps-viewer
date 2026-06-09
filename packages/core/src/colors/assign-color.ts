@@ -16,3 +16,14 @@ export function assignColor(usedCount: number): ColorHex {
   const idx = ((usedCount % n) + n) % n;
   return AUTO_PALETTE[idx]!;
 }
+
+/**
+ * Pick the first auto-palette color that is not already present in the
+ * supplied color list. Falls back to the deterministic cycle when every
+ * auto color is already in use.
+ */
+export function assignUnusedColor(usedColors: Iterable<string>, fallbackIndex: number): ColorHex {
+  const used = new Set([...usedColors].map((color) => color.toLowerCase()));
+  const available = AUTO_PALETTE.find((color) => !used.has(color.toLowerCase()));
+  return available ?? assignColor(fallbackIndex);
+}

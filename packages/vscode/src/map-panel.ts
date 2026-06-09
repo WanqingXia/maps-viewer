@@ -17,7 +17,7 @@ import type {
 } from '@maps-viewer/shared';
 import type { FeatureCollection, Geometry, Position } from 'geojson';
 import { EMPTY_LAYER_STATE, STROKE_WIDTH_DEFAULT } from '@maps-viewer/shared';
-import { reduce, assignColor, collectPkValues, extractPropertyKeys, COUNTRY_BBOXES } from '@maps-viewer/core';
+import { reduce, assignUnusedColor, collectPkValues, extractPropertyKeys, COUNTRY_BBOXES } from '@maps-viewer/core';
 import type { WorkspaceFolderInfo } from '@maps-viewer/core';
 import { toProjectFileRef } from '@maps-viewer/core';
 import { readGeoJsonFile } from './util/parse-geojson.js';
@@ -107,6 +107,18 @@ export class MapPanel {
 
   static activeForWindow(): MapPanel | undefined {
     return MapPanel.lastFocused;
+  }
+
+  /** Locate a feature by file URI + FeatureCollection.features[index]. */
+  static locateFeatureInOpenPanel(uri: vscode.Uri, featureIndex: number): boolean {
+    const panels = [...MapPanel.panels.values()];
+    const ordered = MapPanel.lastFocused
+      ? [MapPanel.lastFocused, ...panels.filter((panel) => panel !== MapPanel.lastFocused)]
+      : panels;
+    for (const panel of ordered) {
+      if (panel.locateFeatureBySourceUri(uri, featureIndex)) return true;
+    }
+    return false;
   }
 
   /** Get the existing panel for a given key, if open. */
@@ -286,6 +298,12 @@ export class MapPanel {
     return true;
   }
 
+  private locateFeatureBySourceUri(uri: vscode.Uri, featureIndex: number): boolean {
+    if (!Number.isInteger(featureIndex) || featureIndex < 0) return false;
+    const layer = this.layerState.layers.find((candidate) => sameUri(candidate.sourcePath, uri));
+    return layer ? this.locateFeatureById(layer.id, featureIndex) : false;
+  }
+
   /** Build a ProjectSnapshot suitable for save-project — round-trips camera through the webview. */
   async getProjectSnapshot(workspaces: ReadonlyArray<WorkspaceFolderInfo>): Promise<ProjectSnapshot> {
     const camera = await this.requestCameraState();
@@ -329,7 +347,10 @@ export class MapPanel {
       fileName,
       displayName: fileName,
       sourcePath: uri.toString(),
-      color: assignColor(this.layerState.layers.length),
+      color: assignUnusedColor(
+        this.layerState.layers.map((existing) => existing.color),
+        this.layerState.layers.length,
+      ),
       strokeWidth: STROKE_WIDTH_DEFAULT,
       visible: true,
       groupId: null,
@@ -529,6 +550,20 @@ function featureCentroid(g: Geometry | null): [number, number] | null {
     default:
       return null;
   }
+}
+
+function sameUri(sourcePath: string, uri: vscode.Uri): boolean {
+  if (sourcePath === uri.toString()) return true;
+  try {
+    const source = vscode.Uri.parse(sourcePath);
+    if (source.toString() === uri.toString()) return true;
+    if (source.scheme === 'file' && uri.scheme === 'file') {
+      return source.fsPath === uri.fsPath;
+    }
+  } catch {
+    // sourcePath is extension-owned persisted data; malformed values simply do not match.
+  }
+  return false;
 }
 
 function midOfLine(coords: ReadonlyArray<Position>): [number, number] | null {

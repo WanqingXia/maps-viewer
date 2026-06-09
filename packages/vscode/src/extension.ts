@@ -15,6 +15,7 @@ import { renameProject } from './manager/commands/rename-project.js';
 import { deleteProject } from './manager/commands/delete-project.js';
 import { newProject } from './manager/commands/new-project.js';
 import { maybeShowWelcome } from './welcome.js';
+import { registerEditorFeatureSync } from './editor-feature-sync.js';
 
 let logger: Logger | undefined;
 
@@ -86,6 +87,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
     { dispose: () => logger?.dispose() },
   );
+
+  registerEditorFeatureSync(context, logger);
 
   // One-shot welcome notification on first activation per major version.
   // Fire-and-forget — never blocks activation.
