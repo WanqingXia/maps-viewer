@@ -5,7 +5,7 @@ All notable changes to this project are documented in this file.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This
 project adheres to [Semantic Versioning](https://semver.org/).
 
-## [0.1.1] — Unreleased
+## [0.1.4] — Unreleased
 
 First public-release candidate. Built across 5 phases.
 
@@ -41,6 +41,7 @@ First public-release candidate. Built across 5 phases.
 - `Maps Viewer: Locate Feature…` — flat quick-pick of PK values; map flies + brief yellow pulse
 - `Maps Viewer: Set Country Scope…` — 47 curated countries + World
 - Optional **Point Render** mode that collapses visually tiny line/polygon features into fixed-size dots based on current zoom
+- Feature coordinate inspection, right-click point locating, OSM/GraphHopper open links, and OSM point query
 
 #### Polish + Publish (Phase 5)
 - Marketplace icon (256×256 PNG, rendered from SVG)

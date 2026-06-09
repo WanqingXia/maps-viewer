@@ -65,9 +65,11 @@ describe('WebviewMessage shapes', () => {
     const a: WebviewMessage = { type: 'ready' };
     const b: WebviewMessage = { type: 'mapLoaded' };
     const c: WebviewMessage = { type: 'error', message: 'oops', code: 'X' };
+    const d: WebviewMessage = { type: 'openExternal', url: 'https://www.openstreetmap.org/' };
     expect(a.type).toBe('ready');
     expect(b.type).toBe('mapLoaded');
     expect(c.code).toBe('X');
+    expect(d.url).toContain('openstreetmap');
   });
 });
 

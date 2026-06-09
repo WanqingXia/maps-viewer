@@ -2,6 +2,7 @@ export interface FeatureDetailsModel {
   readonly layerName: string;
   readonly featureId: number | string;
   readonly properties: Record<string, unknown> | null;
+  readonly coordinateLines: readonly string[];
 }
 
 export interface FeatureDetails {
@@ -32,6 +33,11 @@ export function mountFeatureDetails(
   const actions = document.createElement('div');
   actions.className = 'mv-feature-details__actions';
 
+  const coordsBtn = document.createElement('button');
+  coordsBtn.type = 'button';
+  coordsBtn.className = 'mv-feature-details__button';
+  coordsBtn.textContent = 'Coords';
+
   const zoomBtn = document.createElement('button');
   zoomBtn.type = 'button';
   zoomBtn.className = 'mv-feature-details__button';
@@ -47,18 +53,34 @@ export function mountFeatureDetails(
     root.dataset.visible = 'false';
   });
 
-  actions.append(zoomBtn, closeBtn);
+  actions.append(coordsBtn, zoomBtn, closeBtn);
   header.append(title, actions);
 
   const body = document.createElement('div');
   body.className = 'mv-feature-details__body';
-  root.append(header, body);
+
+  const coordsPanel = document.createElement('pre');
+  coordsPanel.className = 'mv-feature-details__coords';
+  coordsPanel.setAttribute('aria-label', 'Feature coordinates');
+  coordsPanel.hidden = true;
+  coordsPanel.textContent = '';
+
+  coordsBtn.addEventListener('click', () => {
+    coordsPanel.hidden = !coordsPanel.hidden;
+  });
+
+  root.append(header, body, coordsPanel);
   container.append(root);
 
   return {
     element: root,
     show(model) {
       title.textContent = `${model.layerName} · feature ${String(model.featureId)}`;
+      coordsPanel.hidden = true;
+      coordsPanel.textContent = model.coordinateLines.length > 0
+        ? model.coordinateLines.join('\n')
+        : '(no coordinates)';
+      coordsBtn.disabled = model.coordinateLines.length === 0;
       const props = model.properties ?? {};
       const keys = Object.keys(props);
       if (keys.length === 0) {

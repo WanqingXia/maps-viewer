@@ -783,6 +783,11 @@ body[data-resizing-panel='true'] {
   cursor: pointer;
 }
 
+.mv-feature-details__button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
 .mv-feature-details__close {
   width: 24px;
   padding: 4px 0;
@@ -813,4 +818,104 @@ body[data-resizing-panel='true'] {
 .mv-feature-details__empty {
   color: rgba(255, 255, 255, 0.55);
   font-style: italic;
+}
+
+.mv-feature-details__coords {
+  margin: 0;
+  max-height: 160px;
+  overflow: auto;
+  padding: 8px 10px 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(0, 0, 0, 0.24);
+  color: #f1f1f1;
+  font-family: var(--vscode-editor-font-family, monospace);
+  font-size: 12px;
+  line-height: 1.45;
+  white-space: pre;
+  user-select: text;
+}
+
+.mv-coordinate-popup {
+  position: absolute;
+  z-index: 8;
+  display: none;
+  max-width: 300px;
+  padding: 8px 10px;
+  background: rgba(20, 20, 20, 0.94);
+  color: #f1f1f1;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  font-size: 12px;
+  line-height: 1.45;
+  pointer-events: auto;
+  user-select: text;
+}
+
+.mv-coordinate-popup[data-visible='true'] {
+  display: block;
+}
+
+.mv-coordinate-popup__button {
+  appearance: none;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.08);
+  color: #f1f1f1;
+  border-radius: 4px;
+  font: inherit;
+  padding: 5px 10px;
+  cursor: pointer;
+}
+
+.mv-coordinate-popup__button:hover {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.mv-coordinate-popup__actions {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.mv-coordinate-popup__title {
+  margin-bottom: 5px;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+}
+
+.mv-coordinate-popup__row {
+  display: grid;
+  grid-template-columns: 74px minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  padding: 2px 0;
+}
+
+.mv-coordinate-popup__row span {
+  color: rgba(255, 255, 255, 0.58);
+}
+
+.mv-coordinate-popup__row strong {
+  font-family: var(--vscode-editor-font-family, monospace);
+  font-weight: 500;
+  min-width: 0;
+  word-break: break-all;
+}
+
+.mv-coordinate-popup__link {
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: #8cc8ff;
+  cursor: pointer;
+  font: inherit;
+  padding: 2px 0;
+  text-decoration: underline;
+}
+
+.mv-coordinate-popup__link:hover {
+  color: #c5e4ff;
 }

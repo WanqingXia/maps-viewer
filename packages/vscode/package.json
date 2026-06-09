@@ -2,7 +2,7 @@
   "name": "maps-viewer",
   "displayName": "Maps Viewer",
   "description": "View, compare, group, scope, and inspect GeoJSON layers on an interactive Mapbox map directly inside VS Code.",
-  "version": "0.1.1",
+  "version": "0.1.4",
   "publisher": "WanqingXia",
   "private": false,
   "license": "MIT",

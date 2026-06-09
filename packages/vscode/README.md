@@ -7,6 +7,7 @@ Maps Viewer turns VS Code into a practical GeoJSON inspection workspace. Open on
 - **Group layers**: create groups, drag profiles in or out, apply shared group color and visibility, and restore profiles back to standard layers when a group is removed.
 - **Country View**: limit the map to a selected country, fit the camera to that area, and prevent accidental navigation away from the chosen scope.
 - **Zoom onto features**: choose a primary key, browse feature records, and jump directly to the selected geometry from the layer panel or command palette.
+- **Coordinate tools**: view clicked-feature coordinates, right-click map points, open OSM/GraphHopper links, and query OSM at a point.
 - **Point Render**: optionally collapse line and polygon features into fixed-size dots only when they become too small to read at the current zoom.
 - **Primary key controls**: select a property per layer, search and sort records, hide/show individual records, and keep feature-level navigation tied to real GeoJSON attributes.
 
@@ -16,6 +17,7 @@ Maps Viewer turns VS Code into a practical GeoJSON inspection workspace. Open on
 - Add multiple GeoJSON files to the same map panel for comparison.
 - Rename layers, change colors, tune stroke width, and hide/show layers or individual records.
 - Hover or click map features to inspect structured properties.
+- Right-click any map point to locate it, open it in OSM or GraphHopper, or query OSM nearby features.
 - Save your current view as a named project and reopen it later with layers, camera, country scope, primary keys, and styling restored.
 - Switch between standard and satellite basemaps.
 

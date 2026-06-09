@@ -79,6 +79,7 @@ export type WebviewMessage =
   | { readonly type: 'locateFeature'; readonly layerId: string; readonly featureId: number }
   | { readonly type: 'addLayerRequest' }
   | { readonly type: 'saveProjectRequest' }
+  | { readonly type: 'openExternal'; readonly url: string }
   | { readonly type: 'cameraState'; readonly requestId: string; readonly camera: ProjectCameraState }
   | { readonly type: 'error'; readonly message: string; readonly code?: string };
 

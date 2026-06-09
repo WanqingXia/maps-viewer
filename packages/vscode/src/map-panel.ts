@@ -430,6 +430,9 @@ export class MapPanel {
       case 'saveProjectRequest':
         void vscode.commands.executeCommand('mapsViewer.saveProject');
         break;
+      case 'openExternal':
+        void this.openExternal(msg.url);
+        break;
       case 'cameraState': {
         const handler = this.cameraRequests.get(msg.requestId);
         if (handler) {
@@ -443,6 +446,21 @@ export class MapPanel {
         void vscode.window.showErrorMessage(`Maps Viewer: ${msg.message}`);
         break;
     }
+  }
+
+  private async openExternal(rawUrl: string): Promise<void> {
+    let uri: vscode.Uri;
+    try {
+      uri = vscode.Uri.parse(rawUrl, true);
+    } catch {
+      void vscode.window.showWarningMessage('Maps Viewer: invalid external link.');
+      return;
+    }
+    if (uri.scheme !== 'https') {
+      void vscode.window.showWarningMessage('Maps Viewer: only HTTPS links can be opened.');
+      return;
+    }
+    await vscode.env.openExternal(uri);
   }
 
   private handleUserAction(action: UserAction): void {

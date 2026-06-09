@@ -23,6 +23,7 @@ import { wireHover } from './hover.js';
 import { mountBasemapToggle, type BasemapToggle } from '../ui/basemap-toggle.js';
 import { mountPropertiesPopup, type PropertiesPopup } from '../ui/properties-popup.js';
 import { mountFeatureDetails, type FeatureDetails } from '../ui/feature-details.js';
+import { mountCoordinatePopup, type CoordinatePopup } from '../ui/coordinate-popup.js';
 
 const STYLES: Record<Basemap, string> = {
   standard: 'mapbox://styles/mapbox/streets-v12',
@@ -32,6 +33,9 @@ const STYLES: Record<Basemap, string> = {
 const POINT_LOCATE_ZOOM_DEFAULT = 16;
 const LOCATE_PULSE_MS = 1500;
 const COUNTRY_VIEW_FACTOR = 2;
+const LOCATE_POINT_SOURCE = 'mv-locate-point-source';
+const LOCATE_POINT_LAYER = 'mv-locate-point-layer';
+const COORD_DECIMALS = 7;
 
 export class MapboxMap {
   private readonly map: MapboxMapInstance;
@@ -41,11 +45,13 @@ export class MapboxMap {
   private currentBasemap: Basemap;
   private readonly popup: PropertiesPopup;
   private readonly details: FeatureDetails;
+  private readonly coordinatePopup: CoordinatePopup;
   private readonly toggle: BasemapToggle;
   private readonly hiddenFeatureIds = new Map<string, Set<number | string>>();
   private readonly collapsedFeatureIds = new Map<string, Set<number | string>>();
   private selectedFeature: { layerId: string; featureId: number | string } | null = null;
   private pointRenderEnabled = false;
+  private locatedPoint: [number, number] | null = null;
 
   constructor(
     container: HTMLElement,
@@ -67,12 +73,14 @@ export class MapboxMap {
       container,
       () => this.zoomToSelectedFeature(),
     );
+    this.coordinatePopup = mountCoordinatePopup(container);
     this.toggle = mountBasemapToggle(container, basemap, (next) => this.setBasemap(next));
     this.map.on('error', (e: unknown) => {
       const detail = (e as { error?: { message?: string } }).error?.message ?? 'unknown';
       this.send({ type: 'error', message: `mapbox: ${detail}`, code: 'MAPBOX_ERROR' });
     });
     this.map.on('click', (event: unknown) => this.handleMapClick(event));
+    this.map.on('contextmenu', (event: unknown) => this.handleMapContextMenu(event));
     this.map.on('zoom', () => this.updateCollapsedFeatureIds());
   }
 
@@ -228,6 +236,7 @@ export class MapboxMap {
         );
         this.hoverDisposers.set(id, disposer);
       }
+      this.renderLocatedPoint();
       this.updateCollapsedFeatureIds();
     });
   }
@@ -312,6 +321,7 @@ export class MapboxMap {
     this.toggle.destroy();
     this.popup.destroy();
     this.details.destroy();
+    this.coordinatePopup.destroy();
     this.map.remove();
   }
 
@@ -403,6 +413,8 @@ export class MapboxMap {
   }
 
   private handleMapClick(event: unknown): void {
+    this.coordinatePopup.hide();
+    this.clearLocatedPoint();
     const point = (event as { point?: { x: number; y: number } }).point;
     if (!point) return;
     const layers = [...this.layers.keys()].flatMap((layerId) => [...sublayerIds(layerId)]);
@@ -417,11 +429,52 @@ export class MapboxMap {
     const layer = this.layers.get(layerId);
     if (!layer) return;
     this.selectedFeature = { layerId, featureId: feature.id };
+    const realFeature = Number.isInteger(Number(feature.id))
+      ? this.layerData.get(layerId)?.features[Number(feature.id)]
+      : undefined;
     this.details.show({
       layerName: layer.displayName,
       featureId: feature.id,
       properties: feature.properties,
+      coordinateLines: coordinateLinesOfGeometry(realFeature?.geometry ?? feature.geometry),
     });
+  }
+
+  private handleMapContextMenu(event: unknown): void {
+    const e = event as {
+      point?: { x: number; y: number };
+      lngLat?: { lng: number; lat: number };
+      originalEvent?: { preventDefault?: () => void };
+    };
+    e.originalEvent?.preventDefault?.();
+    if (!e.point || !e.lngLat) return;
+    const lng = e.lngLat.lng;
+    const lat = e.lngLat.lat;
+    const x = e.point.x;
+    const y = e.point.y;
+    this.locatedPoint = [lng, lat];
+    this.renderLocatedPoint();
+    this.coordinatePopup.showLocateActions(
+      x,
+      y,
+      lat,
+      lng,
+      () => {
+        this.coordinatePopup.showFormats(
+          x,
+          y,
+          lat,
+          lng,
+          () => this.openExternal(osmMapUrl(lat, lng)),
+          () => this.openExternal(graphHopperUrl(lat, lng)),
+        );
+      },
+      () => this.openExternal(osmQueryUrl(lat, lng)),
+    );
+  }
+
+  private openExternal(url: string): void {
+    this.send({ type: 'openExternal', url });
   }
 
   private layerIdForFeatureSource(source: string): string {
@@ -456,6 +509,45 @@ export class MapboxMap {
       minLng -= pad; maxLng += pad; minLat -= pad; maxLat += pad;
     }
     this.map.fitBounds([[minLng, minLat], [maxLng, maxLat]], { padding: 40, animate: false, duration: 0 });
+  }
+
+  private renderLocatedPoint(): void {
+    if (!this.locatedPoint) return;
+    const data: GeoJSON.FeatureCollection = {
+      type: 'FeatureCollection',
+      features: [
+        {
+          type: 'Feature',
+          properties: {},
+          geometry: { type: 'Point', coordinates: this.locatedPoint },
+        },
+      ],
+    };
+    const source = this.map.getSource(LOCATE_POINT_SOURCE) as { setData?: (next: GeoJSON.FeatureCollection) => void } | undefined;
+    if (source?.setData) {
+      source.setData(data);
+    } else if (!source) {
+      this.map.addSource(LOCATE_POINT_SOURCE, { type: 'geojson', data });
+    }
+    if (!this.map.getLayer(LOCATE_POINT_LAYER)) {
+      this.map.addLayer({
+        id: LOCATE_POINT_LAYER,
+        type: 'circle',
+        source: LOCATE_POINT_SOURCE,
+        paint: {
+          'circle-radius': 5,
+          'circle-color': '#ffcc00',
+          'circle-stroke-color': '#111111',
+          'circle-stroke-width': 2,
+        },
+      });
+    }
+  }
+
+  private clearLocatedPoint(): void {
+    this.locatedPoint = null;
+    if (this.map.getLayer(LOCATE_POINT_LAYER)) this.map.removeLayer(LOCATE_POINT_LAYER);
+    if (this.map.getSource(LOCATE_POINT_SOURCE)) this.map.removeSource(LOCATE_POINT_SOURCE);
   }
 }
 
@@ -526,6 +618,29 @@ function* coordsOfGeometry(g: GeoJSON.Geometry): Generator<[number, number]> {
       for (const inner of g.geometries) yield* coordsOfGeometry(inner);
       return;
   }
+}
+
+function coordinateLinesOfGeometry(g: GeoJSON.Geometry | null): string[] {
+  if (!g) return [];
+  return [...coordsOfGeometry(g)].map(([lng, lat]) => `${formatCoord(lat)},${formatCoord(lng)}`);
+}
+
+function formatCoord(value: number): string {
+  return value.toFixed(COORD_DECIMALS);
+}
+
+function osmMapUrl(lat: number, lng: number): string {
+  const latText = formatCoord(lat);
+  const lngText = formatCoord(lng);
+  return `https://www.openstreetmap.org/?mlat=${latText}&mlon=${lngText}#map=18/${latText}/${lngText}`;
+}
+
+function osmQueryUrl(lat: number, lng: number): string {
+  return `https://www.openstreetmap.org/query?lat=${formatCoord(lat)}&lon=${formatCoord(lng)}`;
+}
+
+function graphHopperUrl(lat: number, lng: number): string {
+  return `https://graphhopper.com/maps/?point=${encodeURIComponent(`${formatCoord(lat)},${formatCoord(lng)}`)}`;
 }
 
 // === Tiny adapter helpers because our ambient typings are intentionally minimal ===
