@@ -6,7 +6,7 @@ Right-click any `.geojson` file → **View in Maps** → see it on a real map wi
 
 ![Maps Viewer logo](logo.png)
 
-> **Status**: v0.1.4 (alpha — first public release candidate). Built across 5 phases from spec to ship; see `.claude/PRPs/` for the full PRD, plans, and per-phase implementation reports.
+> **Status**: v0.2.0 (alpha — first public release candidate). Built across 5 phases from spec to ship; see `.claude/PRPs/` for the full PRD, plans, and per-phase implementation reports.
 
 ---
 
@@ -22,7 +22,7 @@ Right-click any `.geojson` file → **View in Maps** → see it on a real map wi
 - **Primary key records** — select a property per layer, search/sort records, hide/show individual records, and zoom to a single feature
 - **Zoom onto features** — fly directly to a selected geometry from records or the command palette
 - **Editor-to-map zoom** — click inside a `.geojson` feature record in the editor to zoom the open map to that feature
-- **Coordinate tools** — inspect feature coordinates, right-click map points, open OSM/GraphHopper links, and query OSM at a point
+- **Coordinate tools** — inspect feature coordinates, right-click map points, query OSM, open Google Street View, and open OSM/GraphHopper links
 - **Country View** — pick from curated countries to fit and constrain the map to that region
 - **Point Render** — optionally collapse lines/shapes into fixed-size dots only when they become too small at the current zoom
 - **Adjustable stroke width** — 0–30 per layer, live preview as you drag
@@ -104,7 +104,7 @@ Package + install locally:
 ```bash
 pnpm build
 pnpm --filter maps-viewer run package
-code --install-extension packages/vscode/maps-viewer-0.1.4.vsix --force
+code --install-extension packages/vscode/maps-viewer-0.2.0.vsix --force
 ```
 
 See `.claude/PRPs/` for:

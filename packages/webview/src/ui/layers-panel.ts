@@ -32,6 +32,7 @@ export function mountLayersPanel(
   onLocateFeature: (layerId: string, featureId: number) => void,
   onFeatureVisible: (layerId: string, featureId: number, visible: boolean) => void,
   onFeaturesVisible: (layerId: string, featureIds: ReadonlyArray<number>, visible: boolean) => void,
+  onRefreshLayer: (layerId: string) => void,
   onAddLayer: () => void,
   onSaveProject: () => void,
 ): LayersPanel {
@@ -184,6 +185,7 @@ export function mountLayersPanel(
           onLocateFeature,
           onFeatureVisible,
           onFeaturesVisible,
+          onRefreshLayer,
         );
         layerRows.set(layer.id, row);
       } else {

@@ -6,7 +6,7 @@ import { reduce, applyActions, layersInGroup } from '../layer-state.js';
 const RED: ColorHex = '#e6194b';
 const GREEN: ColorHex = '#3cb44b';
 const BLUE: ColorHex = '#4363d8';
-const YELLOW: ColorHex = '#ffe119';
+const YELLOW: ColorHex = '#ebbd4d';
 
 function makeLayer(overrides: Partial<Layer> & { id: string }): Layer {
   return {

@@ -487,6 +487,33 @@ body[data-resizing-panel='true'] {
   color: rgba(255, 180, 180, 0.95);
 }
 
+/* Refresh button — second line, same box + right-alignment as the red ×
+   in the first line (grid column 7) so the two align vertically. */
+.mv-layer-row__refresh {
+  grid-column: 7 / 8;
+  grid-row: 2;
+  appearance: none;
+  border: none;
+  background: transparent;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  justify-self: end;
+  width: 20px;
+  min-width: 20px;
+  height: 26px;
+  padding: 0;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+  color: var(--vscode-icon-foreground, rgba(255, 255, 255, 0.85));
+}
+
+.mv-layer-row__refresh:hover {
+  background: var(--vscode-toolbar-hoverBackground, rgba(255, 255, 255, 0.08));
+}
+
 /* === Group header === */
 .mv-group-header {
   display: grid;

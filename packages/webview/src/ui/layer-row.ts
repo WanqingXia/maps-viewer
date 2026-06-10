@@ -2,6 +2,60 @@ import type { FeatureOption, Layer, LayerFeatureMeta, UserAction } from '@maps-v
 import { mountStrokeSlider, type StrokeSliderEl } from './stroke-slider.js';
 import { mountColorPicker } from './color-picker.js';
 
+/**
+ * Natural (numeric-aware) collator for ranking record labels.
+ *
+ * Plain `String.localeCompare` sorts lexicographically, so numeric IDs
+ * come out as 1, 10, 100, 1001, 1002, 2, 3 — the "1, 1001, 1002" bug.
+ * `numeric: true` makes embedded digit runs compare by value, giving
+ * 1, 2, 3, ... 10, ... 1001. `sensitivity: 'base'` keeps it case/accent
+ * insensitive so "Site A" and "site a" rank together. Constructed once at
+ * module scope to avoid rebuilding a collator on every comparison.
+ */
+const RECORD_COLLATOR = new Intl.Collator(undefined, {
+  numeric: true,
+  sensitivity: 'base',
+});
+
+const INTEGER_LABEL_RE = /^[+-]?\d+$/;
+
+function isFiniteNumeric(label: string): boolean {
+  const trimmed = label.trim();
+  return trimmed !== '' && Number.isFinite(Number(trimmed));
+}
+
+function isIntegerLabel(label: string): boolean {
+  return INTEGER_LABEL_RE.test(label.trim());
+}
+
+/**
+ * Pick the right comparator for a column of record labels.
+ *
+ * - **Pure-integer column** → the collator (numeric:true). It compares
+ *   digit-runs as integers, which is correct for ints AND stays precise
+ *   for IDs beyond 2^53 where `Number()` would round.
+ * - **Column with any float** → compare by numeric value. The collator
+ *   can't do this: it treats the fractional part as a separate integer
+ *   run, so 0.689 ("…68998…") sorts before 0.136 ("…136291…"). Comparing
+ *   `Number(a) - Number(b)` orders decimals correctly; ties fall back to
+ *   the collator for stability (e.g. "1.0" vs "1").
+ * - **Strings / mixed** → natural collator.
+ *
+ * Mode is decided over the whole column so it stays stable while the user
+ * filters with the search box.
+ */
+function makeLabelComparator(labels: ReadonlyArray<string>): (a: string, b: string) => number {
+  const allNumeric = labels.length > 0 && labels.every(isFiniteNumeric);
+  const hasFloat = allNumeric && labels.some((label) => !isIntegerLabel(label));
+  if (hasFloat) {
+    return (a, b) => {
+      const diff = Number(a) - Number(b);
+      return diff !== 0 ? diff : RECORD_COLLATOR.compare(a, b);
+    };
+  }
+  return (a, b) => RECORD_COLLATOR.compare(a, b);
+}
+
 export interface LayerRow {
   element: HTMLElement;
   update(options: LayerRowOptions): void;
@@ -22,6 +76,7 @@ export function mountLayerRow(
   onLocateFeature: (layerId: string, featureId: number) => void,
   onFeatureVisible: (layerId: string, featureId: number, visible: boolean) => void,
   onFeaturesVisible: (layerId: string, featureIds: ReadonlyArray<number>, visible: boolean) => void,
+  onRefreshLayer: (layerId: string) => void,
 ): LayerRow {
   let current = options.layer;
   let currentOptions = options;
@@ -69,6 +124,11 @@ export function mountLayerRow(
 
   const expandBtn = iconButton('mv-layer-row__expand', 'Show feature records', 'Records ▾');
 
+  // Second-line refresh button — re-reads this layer's file from disk.
+  // Sits in grid column 7 / row 2, directly under the red × delete button.
+  const refreshBtn = iconButton('mv-layer-row__refresh', `Refresh layer ${current.displayName}`, '⟳');
+  refreshBtn.title = 'Reload data from file';
+
   const records = document.createElement('div');
   records.className = 'mv-layer-row__records';
   records.dataset.visible = 'false';
@@ -88,7 +148,7 @@ export function mountLayerRow(
   recordsList.className = 'mv-layer-row__records-list';
   records.append(recordsToolbar, recordsList);
 
-  row.append(move, visBtn, swatch, name, rowCount, delBtn, stroke.element, pk, expandBtn, records);
+  row.append(move, visBtn, swatch, name, rowCount, delBtn, stroke.element, pk, expandBtn, refreshBtn, records);
 
   const picker = mountColorPicker((color) =>
     onAction({ type: 'setLayerColor', layerId: current.id, color }),
@@ -123,6 +183,7 @@ export function mountLayerRow(
     onAction({ type: 'renameLayer', layerId: current.id, name: name.value });
   });
   delBtn.addEventListener('click', () => onAction({ type: 'removeLayer', layerId: current.id }));
+  refreshBtn.addEventListener('click', () => onRefreshLayer(current.id));
   pk.addEventListener('change', () => {
     const value = pk.value === '' ? null : pk.value;
     onPrimaryKey(current.id, value);
@@ -174,6 +235,7 @@ export function mountLayerRow(
     swatch.disabled = current.groupId !== null;
     swatch.setAttribute('aria-label', current.groupId ? 'Grouped layers use group color' : `Change color of layer ${current.displayName}`);
     delBtn.setAttribute('aria-label', `Remove layer ${current.displayName}`);
+    refreshBtn.setAttribute('aria-label', `Refresh layer ${current.displayName}`);
     rowCount.textContent = `rows: ${currentOptions.meta?.featureCount ?? 0}`;
     rowCount.title = rowCount.textContent;
     if (document.activeElement !== name) {
@@ -238,9 +300,13 @@ export function mountLayerRow(
 
   function visibleRecordItems(): FeatureOption[] {
     const normalizedQuery = query.trim().toLowerCase();
-    return [...allRecordItems()]
+    const all = allRecordItems();
+    // Decide the comparator over the full column so the sort mode (int /
+    // float / string) doesn't change as the search box filters rows.
+    const compare = makeLabelComparator(all.map((item) => item.label));
+    return [...all]
       .filter((item) => normalizedQuery === '' || item.label.toLowerCase().includes(normalizedQuery))
-      .sort((a, b) => sortAsc ? a.label.localeCompare(b.label) : b.label.localeCompare(a.label));
+      .sort((a, b) => (sortAsc ? compare(a.label, b.label) : -compare(a.label, b.label)));
   }
 
   function recordRow(item: FeatureOption): HTMLElement {

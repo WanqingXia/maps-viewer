@@ -5,7 +5,7 @@ All notable changes to this project are documented in this file.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This
 project adheres to [Semantic Versioning](https://semver.org/).
 
-## [0.1.4] — Unreleased
+## [0.2.0] — Unreleased
 
 First public-release candidate. Built across 5 phases.
 
@@ -41,7 +41,7 @@ First public-release candidate. Built across 5 phases.
 - `Maps Viewer: Locate Feature…` — flat quick-pick of PK values; map flies + brief yellow pulse
 - `Maps Viewer: Set Country Scope…` — 47 curated countries + World
 - Optional **Point Render** mode that collapses visually tiny line/polygon features into fixed-size dots based on current zoom
-- Feature coordinate inspection, right-click point locating, OSM/GraphHopper open links, and OSM point query
+- Feature coordinate inspection, right-click point info, OSM/GraphHopper open links, OSM point query, and Google Street View launch
 - Editor-to-map zoom: click inside a `.geojson` feature record to zoom the open map to that feature
 - Right-click locate points now clear when the user left-clicks the map
 - Adding a GeoJSON to an existing map now prefers unused auto-palette colors before repeating

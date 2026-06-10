@@ -244,6 +244,41 @@ export class MapPanel {
     });
   }
 
+  /**
+   * Re-read a layer's GeoJSON from disk and push the fresh data to the
+   * webview. Re-uses the `addLayer` action: the webview detects the
+   * existing source and rebuilds it in place (without moving the camera).
+   * The layer's id, color, stroke, visibility, and grouping are preserved;
+   * only the geometry/properties + row count update.
+   */
+  async refreshLayer(layerId: string): Promise<void> {
+    const layer = this.layerState.layers.find((candidate) => candidate.id === layerId);
+    if (!layer) return;
+    let fc: FeatureCollection;
+    try {
+      fc = await readGeoJsonFile(vscode.Uri.parse(layer.sourcePath));
+    } catch (err) {
+      this.logger.error(`refreshLayer failed for ${layer.sourcePath}`, err);
+      const detail = err instanceof Error ? err.message : String(err);
+      void vscode.window.showErrorMessage(`Maps Viewer: could not refresh "${layer.displayName}": ${detail}`);
+      return;
+    }
+    const refreshed: Layer = { ...layer, featureCount: fc.features.length };
+    this.layerData.set(layerId, fc);
+    this.layerState = {
+      ...this.layerState,
+      layers: this.layerState.layers.map((candidate) =>
+        candidate.id === layerId ? refreshed : candidate,
+      ),
+    };
+    this.queueOrPost({
+      type: 'applyAction',
+      action: { type: 'addLayer', layer: refreshed },
+      layerData: { [layerId]: fc },
+    });
+    this.logger.info(`refreshed layer ${layerId} (${fc.features.length} features)`);
+  }
+
   setBasemap(basemap: Basemap): void {
     this.queueOrPost({ type: 'setBasemap', basemap });
   }
@@ -444,6 +479,9 @@ export class MapPanel {
         if (!this.locateFeatureById(msg.layerId, msg.featureId)) {
           void vscode.window.showWarningMessage('Maps Viewer: feature not found.');
         }
+        break;
+      case 'refreshLayer':
+        void this.refreshLayer(msg.layerId);
         break;
       case 'addLayerRequest':
         void vscode.commands.executeCommand('mapsViewer.addFileToMap');

@@ -1,6 +1,16 @@
 export interface CoordinatePopup {
-  showLocateActions(x: number, y: number, lat: number, lng: number, onLocate: () => void, onQueryOsm: () => void): void;
-  showFormats(x: number, y: number, lat: number, lng: number, onOpenOsm: () => void, onOpenGraphHopper: () => void): void;
+  showPointInfo(
+    x: number,
+    y: number,
+    lat: number,
+    lng: number,
+    actions: {
+      readonly onQueryOsm: () => void;
+      readonly onGoogleStreetView: () => void;
+      readonly onOpenOsm: () => void;
+      readonly onOpenGraphHopper: () => void;
+    },
+  ): void;
   hide(): void;
   destroy(): void;
 }
@@ -30,32 +40,27 @@ export function mountCoordinatePopup(container: HTMLElement): CoordinatePopup {
   }
 
   return {
-    showLocateActions(x, y, _lat, _lng, onLocate, onQueryOsm) {
+    showPointInfo(x, y, lat, lng, actions) {
+      const osm = `${formatCoord(lng)},${formatCoord(lat)}`;
+      const gh = `${formatCoord(lat)},${formatCoord(lng)}`;
       root.innerHTML = '';
-      const actions = document.createElement('div');
-      actions.className = 'mv-coordinate-popup__actions';
-      const locateButton = document.createElement('button');
-      locateButton.type = 'button';
-      locateButton.className = 'mv-coordinate-popup__button';
-      locateButton.textContent = 'Locate Point';
-      locateButton.addEventListener('click', onLocate);
+      const actionRow = document.createElement('div');
+      actionRow.className = 'mv-coordinate-popup__actions';
       const queryButton = document.createElement('button');
       queryButton.type = 'button';
       queryButton.className = 'mv-coordinate-popup__button';
       queryButton.textContent = 'Query OSM';
-      queryButton.addEventListener('click', onQueryOsm);
-      actions.append(locateButton, queryButton);
-      root.append(actions);
-      show();
-      position(x, y);
-    },
-    showFormats(x, y, lat, lng, onOpenOsm, onOpenGraphHopper) {
-      const osm = `${formatCoord(lng)},${formatCoord(lat)}`;
-      const gh = `${formatCoord(lat)},${formatCoord(lng)}`;
-      root.innerHTML = '<div class="mv-coordinate-popup__title">Located point</div>';
+      queryButton.addEventListener('click', actions.onQueryOsm);
+      const streetViewButton = document.createElement('button');
+      streetViewButton.type = 'button';
+      streetViewButton.className = 'mv-coordinate-popup__button';
+      streetViewButton.textContent = 'Google Street View';
+      streetViewButton.addEventListener('click', actions.onGoogleStreetView);
+      actionRow.append(queryButton, streetViewButton);
+      root.append(actionRow);
       root.append(
-        formatRow('OSM format:', osm, onOpenOsm),
-        formatRow('GH format:', gh, onOpenGraphHopper),
+        formatRow('OSM format:', osm, actions.onOpenOsm),
+        formatRow('GH format:', gh, actions.onOpenGraphHopper),
       );
       show();
       position(x, y);

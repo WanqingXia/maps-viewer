@@ -216,6 +216,9 @@ async function handleInit(msg: Extract<HostMessage, { type: 'init' }>): Promise<
       else hiddenFeatureIds.set(layerId, hidden);
       updatePanel();
     },
+    (layerId) => {
+      send({ type: 'refreshLayer', layerId });
+    },
     () => send({ type: 'addLayerRequest' }),
     () => send({ type: 'saveProjectRequest' }),
   );

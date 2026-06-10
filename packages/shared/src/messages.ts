@@ -77,6 +77,7 @@ export type WebviewMessage =
   | { readonly type: 'setCountry'; readonly country: CountryCode | null }
   | { readonly type: 'setPrimaryKey'; readonly layerId: string; readonly key: string | null }
   | { readonly type: 'locateFeature'; readonly layerId: string; readonly featureId: number }
+  | { readonly type: 'refreshLayer'; readonly layerId: string }
   | { readonly type: 'addLayerRequest' }
   | { readonly type: 'saveProjectRequest' }
   | { readonly type: 'openExternal'; readonly url: string }

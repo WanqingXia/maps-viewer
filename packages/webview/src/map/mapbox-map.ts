@@ -33,6 +33,22 @@ const STYLES: Record<Basemap, string> = {
 const POINT_LOCATE_ZOOM_DEFAULT = 16;
 const LOCATE_PULSE_MS = 1500;
 const COUNTRY_VIEW_FACTOR = 2;
+/**
+ * How much larger the viewport is than the located feature.
+ *
+ * A factor of 10 means the feature spans ~1/10 of the view in its larger
+ * dimension — the map is "10× bigger than the feature", giving generous
+ * context without filling the screen. Lower it (e.g. 4–6) for tighter
+ * framing. Applied by expanding the feature bbox before fitBounds, so it
+ * is resolution-independent.
+ */
+const LOCATE_VIEWPORT_FACTOR = 10;
+/**
+ * Zoom cap for Locate. Points (zero-size) fly to exactly this zoom, and
+ * very small features are capped here so a 3 m building doesn't zoom to
+ * street level just because 3 m × 10 is still tiny.
+ */
+const LOCATE_MAX_ZOOM = POINT_LOCATE_ZOOM_DEFAULT;
 const LOCATE_POINT_SOURCE = 'mv-locate-point-source';
 const LOCATE_POINT_LAYER = 'mv-locate-point-layer';
 const COORD_DECIMALS = 7;
@@ -99,10 +115,17 @@ export class MapboxMap {
       case 'addLayer': {
         const data = layerData?.[action.layer.id];
         if (!data) return;
-        this.layers.set(action.layer.id, action.layer);
-        this.layerData.set(action.layer.id, data);
-        renderLayer(this.map, action.layer, data, this.pointRenderEnabled);
         const layerId = action.layer.id;
+        // Refresh path: if this layer already exists (re-reading the file
+        // from disk re-sends `addLayer`), tear its render down first so we
+        // rebuild source + sublayers + dot source + hover with the fresh
+        // data. We deliberately do NOT re-fit the camera on refresh — only
+        // on a genuinely new layer — so a refresh updates in place.
+        const isNew = !this.map.getSource(layerId);
+        if (!isNew) this.teardownLayerRender(layerId);
+        this.layers.set(layerId, action.layer);
+        this.layerData.set(layerId, data);
+        renderLayer(this.map, action.layer, data, this.pointRenderEnabled);
         const disposer = wireHover(
           this.map,
           layerId,
@@ -111,17 +134,11 @@ export class MapboxMap {
         );
         this.hoverDisposers.set(layerId, disposer);
         this.updateCollapsedFeatureIds();
-        this.fitToLayers();
+        if (isNew) this.fitToLayers();
         return;
       }
       case 'removeLayer': {
-        this.hoverDisposers.get(action.layerId)?.();
-        this.hoverDisposers.delete(action.layerId);
-        for (const id of sublayerIds(action.layerId)) {
-          if (this.map.getLayer(id)) this.map.removeLayer(id);
-        }
-        if (this.map.getSource(action.layerId)) this.map.removeSource(action.layerId);
-        if (this.map.getSource(dotSourceId(action.layerId))) this.map.removeSource(dotSourceId(action.layerId));
+        this.teardownLayerRender(action.layerId);
         this.layers.delete(action.layerId);
         this.layerData.delete(action.layerId);
         this.collapsedFeatureIds.delete(action.layerId);
@@ -271,11 +288,20 @@ export class MapboxMap {
     const feature = this.layerData.get(layerId)?.features[featureId];
     const bounds = feature ? boundsOfGeometry(feature.geometry) : null;
     if (bounds && !isPointBounds(bounds)) {
-      this.map.fitBounds(
-        [[bounds[0], bounds[1]], [bounds[2], bounds[3]]],
-        { padding: 72, animate: true, duration: 800 },
-      );
+      // Polygon / LineString / any feature with extent: frame it so the
+      // feature occupies ~1/LOCATE_VIEWPORT_FACTOR of the view (the map is
+      // "N× bigger than the feature"). Expanding the bbox is resolution-
+      // independent; maxZoom keeps very small features from over-zooming.
+      const view = expandedBounds(bounds, LOCATE_VIEWPORT_FACTOR);
+      this.map.fitBounds(view, {
+        padding: 24,
+        maxZoom: LOCATE_MAX_ZOOM,
+        animate: true,
+        duration: 800,
+      });
     } else {
+      // Point / MultiPoint (zero extent): "N× feature size" is undefined,
+      // so fly to a fixed contextual zoom.
       this.map.flyTo({
         center: [center[0], center[1]],
         zoom: zoom ?? POINT_LOCATE_ZOOM_DEFAULT,
@@ -292,6 +318,23 @@ export class MapboxMap {
         this.map.setFeatureState({ source: layerId, id: featureId }, { hover: false });
       } catch { /* noop */ }
     }, LOCATE_PULSE_MS);
+  }
+
+  /**
+   * Remove a layer's rendered artifacts — hover handlers, the three
+   * geometry sublayers, the main source, and the dot source. Does NOT
+   * touch `this.layers` / `this.layerData` / `this.collapsedFeatureIds`;
+   * callers decide whether to drop those (removeLayer) or re-set them
+   * (addLayer refresh).
+   */
+  private teardownLayerRender(layerId: string): void {
+    this.hoverDisposers.get(layerId)?.();
+    this.hoverDisposers.delete(layerId);
+    for (const id of sublayerIds(layerId)) {
+      if (this.map.getLayer(id)) this.map.removeLayer(id);
+    }
+    if (this.map.getSource(layerId)) this.map.removeSource(layerId);
+    if (this.map.getSource(dotSourceId(layerId))) this.map.removeSource(dotSourceId(layerId));
   }
 
   /** Snapshot the current camera state — used for Project save. */
@@ -454,23 +497,12 @@ export class MapboxMap {
     const y = e.point.y;
     this.locatedPoint = [lng, lat];
     this.renderLocatedPoint();
-    this.coordinatePopup.showLocateActions(
-      x,
-      y,
-      lat,
-      lng,
-      () => {
-        this.coordinatePopup.showFormats(
-          x,
-          y,
-          lat,
-          lng,
-          () => this.openExternal(osmMapUrl(lat, lng)),
-          () => this.openExternal(graphHopperUrl(lat, lng)),
-        );
-      },
-      () => this.openExternal(osmQueryUrl(lat, lng)),
-    );
+    this.coordinatePopup.showPointInfo(x, y, lat, lng, {
+      onQueryOsm: () => this.openExternal(osmQueryUrl(lat, lng)),
+      onGoogleStreetView: () => this.openExternal(googleStreetViewUrl(lat, lng)),
+      onOpenOsm: () => this.openExternal(osmMapUrl(lat, lng)),
+      onOpenGraphHopper: () => this.openExternal(graphHopperUrl(lat, lng)),
+    });
   }
 
   private openExternal(url: string): void {
@@ -641,6 +673,10 @@ function osmQueryUrl(lat: number, lng: number): string {
 
 function graphHopperUrl(lat: number, lng: number): string {
   return `https://graphhopper.com/maps/?point=${encodeURIComponent(`${formatCoord(lat)},${formatCoord(lng)}`)}`;
+}
+
+function googleStreetViewUrl(lat: number, lng: number): string {
+  return `https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${encodeURIComponent(`${formatCoord(lat)},${formatCoord(lng)}`)}`;
 }
 
 // === Tiny adapter helpers because our ambient typings are intentionally minimal ===
