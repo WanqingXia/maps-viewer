@@ -28,6 +28,38 @@ Right-click any `.geojson` file → **View in Maps** → see it on a real map wi
 - **Adjustable stroke width** — 0–30 per layer, live preview as you drag
 - **Bundled Mapbox access** — opens maps immediately with the extension's public token; advanced users can override it with their own token
 
+## Feature demos
+
+### Auto find from editor
+
+Click inside a GeoJSON feature record and Maps Viewer automatically finds that feature, opens the active map, and zooms to the geometry.
+
+![Auto find demo](resources/demos/auto-find.gif)
+
+### Country View
+
+Right-click a GeoJSON file, open it in Maps Viewer, and select a country to focus the map on a bounded country view.
+
+![Country select demo](resources/demos/country-select.gif)
+
+### Feature select and primary key records
+
+Choose the feature key you want to use, then search, sort, hide/show, or zoom to individual records from the layer panel.
+
+![Feature select demo](resources/demos/feature-select.gif)
+
+### Point Render
+
+Turn on **Point Render** to draw tiny lines and polygons as fixed-size points when zoomed out, so their positions stay visible on the map.
+
+![Point Render demo](resources/demos/point-render.gif)
+
+### Right-click coordinate tools
+
+Right-click any map point to query OSM, open Google Street View, or open the same coordinate in OpenStreetMap and GraphHopper formats.
+
+![Right-click tools demo](resources/demos/right-click.gif)
+
 ## Quickstart
 
 ```

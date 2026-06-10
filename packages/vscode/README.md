@@ -12,6 +12,38 @@ Maps Viewer turns VS Code into a practical GeoJSON inspection workspace. Open on
 - **Point Render**: optionally collapse line and polygon features into fixed-size dots only when they become too small to read at the current zoom.
 - **Primary key controls**: select a property per layer, search and sort records, hide/show individual records, and keep feature-level navigation tied to real GeoJSON attributes.
 
+## Feature Demos
+
+### Auto Find From Editor
+
+Click inside a GeoJSON feature record and Maps Viewer automatically finds that feature, opens the active map, and zooms to the geometry.
+
+![Auto find demo](https://raw.githubusercontent.com/WanqingXia/maps-viewer/main/resources/demos/auto-find.gif)
+
+### Country View
+
+Right-click a GeoJSON file, open it in Maps Viewer, and select a country to focus the map on a bounded country view.
+
+![Country select demo](https://raw.githubusercontent.com/WanqingXia/maps-viewer/main/resources/demos/country-select.gif)
+
+### Feature Select And Primary Key Records
+
+Choose the feature key you want to use, then search, sort, hide/show, or zoom to individual records from the layer panel.
+
+![Feature select demo](https://raw.githubusercontent.com/WanqingXia/maps-viewer/main/resources/demos/feature-select.gif)
+
+### Point Render
+
+Turn on **Point Render** to draw tiny lines and polygons as fixed-size points when zoomed out, so their positions stay visible on the map.
+
+![Point Render demo](https://raw.githubusercontent.com/WanqingXia/maps-viewer/main/resources/demos/point-render.gif)
+
+### Right-Click Coordinate Tools
+
+Right-click any map point to query OSM, open Google Street View, or open the same coordinate in OpenStreetMap and GraphHopper formats.
+
+![Right-click tools demo](https://raw.githubusercontent.com/WanqingXia/maps-viewer/main/resources/demos/right-click.gif)
+
 ## What You Can Do
 
 - Right-click any `.geojson` file and choose **View in Maps**.
