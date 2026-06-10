@@ -7,24 +7,23 @@ on:
 
 jobs:
   test:
-    name: typecheck + test + build (node ${{ matrix.node }})
+    name: typecheck + test + build
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        node: [20, 22]
+    env:
+      NODE_VERSION: 22.13.x
+      PNPM_VERSION: 11.0.9
     steps:
       - uses: actions/checkout@v4
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v3
         with:
-          version: 11
+          version: ${{ env.PNPM_VERSION }}
 
-      - name: Setup Node ${{ matrix.node }}
+      - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: ${{ matrix.node }}
+          node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
 
       - name: Install
@@ -42,13 +41,11 @@ jobs:
           pnpm --filter @maps-viewer/core build
           pnpm build
 
-      - name: Package VSIX (node 22 only)
-        if: matrix.node == 22
+      - name: Package VSIX
         working-directory: packages/vscode
         run: pnpm package
 
       - name: Upload VSIX artifact
-        if: matrix.node == 22
         uses: actions/upload-artifact@v4
         with:
           name: vsix

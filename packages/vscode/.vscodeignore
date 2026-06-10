@@ -14,3 +14,6 @@ node_modules/**/test/**
 
 # Build-only assets — only the rendered PNG is shipped, not the SVG source
 resources/icon.svg
+
+# Marketplace demo GIFs are loaded from GitHub raw URLs in README.md.
+resources/demos/**
